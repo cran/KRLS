@@ -35,9 +35,9 @@ function(X=NULL,
 
       # scale
       X.init <- X
-      X.init.sd <- sd(X.init)
+      X.init.sd <- apply(X.init,2,sd)
       y.init <- y
-      y.init.sd <- sd(y.init)
+      y.init.sd <- apply(y.init,2,sd)
       y.init.mean <- mean(y.init)
       X <- scale(X,center=TRUE,scale=X.init.sd)    
       y <- scale(y,center=y.init.mean,scale=y.init.sd)

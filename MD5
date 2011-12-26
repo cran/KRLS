@@ -1,12 +1,12 @@
-0c2c90e6e78b948c8e5c36bfdb5f2cba *DESCRIPTION
+c98cca0bf94bba68354d0252f36ed628 *DESCRIPTION
 64f5dab1a3daf7c037593c7a2453319e *LICENSE
 1847545334d5a4c12ce79fde2c6f7008 *NAMESPACE
 39051a4bd93f24388f3cffed8451da56 *R/gausskernel.R
-d2e18d1ed943bc6ecdde4babc504a542 *R/krls.R
+9e15ad15fd1d55cb15de1b5f4de2e2b6 *R/krls.R
 fd8f2884815820d8c190dcc8b1c0a5b6 *R/looloss.R
-927ddb1416035dd53d2ad4ad98f1073d *R/predict.krls.R
+315ba0f781d58eade95c91cc0a7c04d8 *R/predict.krls.R
 3e48f559f09eef1d2a78c225e03bb760 *R/solveforc.R
-13c9fb972e224d58a680a0a4821cbb5d *R/zzz.r
+db2b668981a2178fa7733b313c33ac13 *R/zzz.r
 fd20a52cecffc42391278c022e8c5993 *man/gausskernel.Rd
 2fe4bf080b76fc4ef6bd7a2e485bab21 *man/krls.Rd
 3a7e81c06286e15fb855c00ea1a6b50b *man/looloss.Rd

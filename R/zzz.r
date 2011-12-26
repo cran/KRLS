@@ -1,8 +1,8 @@
-.onLoad <-
+.onAttach <-
 function (libname, pkgname)
 {
    # echo output to screen
-   cat("##\n## KRLS Package for Kernel-based Regularized Least Squares.\n")
+   packageStartupMessage("##\n## KRLS Package for Kernel-based Regularized Least Squares.\n")
 
 }
 

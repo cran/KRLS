@@ -17,7 +17,7 @@ function(object,newdata,se.fit = FALSE,...)
         }
         # scale
         Xmeans <- colMeans(object$X)
-        Xsd    <- sd(object$X)
+        Xsd    <- apply(object$X,2,sd)
         X      <- scale(object$X,center=Xmeans,scale=Xsd)
         # scale test data by means and sd of training data
         newdata.init <- newdata
@@ -37,14 +37,14 @@ function(object,newdata,se.fit = FALSE,...)
         # transform to variance of c's on standarized scale
         vcov.c.raw <-  object$vcov.c * as.vector((1/var(object$y)))
         vcov.fitted <- tcrossprod(newdataK%*%vcov.c.raw,newdataK)          
-        vcov.fit <- (sd(object$y)^2)*vcov.fitted
+        vcov.fit <- (apply(object$y,2,sd)^2)*vcov.fitted
         se.fit <- matrix(sqrt(diag(vcov.fit)),ncol=1)
         } else {
          vcov.fit <- se.fit <- NULL
         }
         
         # bring back to original scale
-        yfitted <- (yfitted*sd(object$y))+mean(object$y)
+        yfitted <- (yfitted * apply(object$y,2,sd))+mean(object$y)
         
         
        return(
