@@ -11,7 +11,8 @@ with a square loss using Gaussian Kernels as radial basis functions (see details
 
 }
 \usage{
-krls(X = NULL, y = NULL, whichkernel = "gauss", lambda = NULL, sigma = NULL, derivative = FALSE, print.level = 0)
+krls(X = NULL, y = NULL, whichkernel = "gauss", lambda = NULL,
+sigma = NULL, derivative = TRUE, print.level = 0)
 }
 
 \arguments{
@@ -129,6 +130,36 @@ The function requires the storage of a n by n kernel matrix and therefore exceed
 }
 \examples{
 
+# Linear example
+# set up data
+N <- 200
+x1 <- rnorm(N)
+x2 <- rbinom(N,size=1,prob=.2)
+y <- x1 + .5*x2 + rnorm(N,0,.15)
+X <- cbind(x1,x2)
+# fit model
+krlsout <- krls(X=X,y=y)
+# summarize marginal effects and contribution of each variable
+summary(krlsout)
+# plot marginal effects and conditional expectation plots
+plot(krlsout)
+
+
+# non-linear example
+# set up data
+N <- 200
+x1 <- rnorm(N)
+x2 <- rbinom(N,size=1,prob=.2)
+y <- x1^3 + .5*x2 + rnorm(N,0,.15)
+X <- cbind(x1,x2)
+
+# fit model
+krlsout <- krls(X=X,y=y)
+# summarize marginal effects and contribution of each variable
+summary(krlsout)
+# plot marginal effects and conditional expectation plots
+plot(krlsout)
+
 ## 2D example:
 # predictor data
 X <- matrix(seq(-3,3,.1))
@@ -137,7 +168,7 @@ Ytrue <- sin(X)
 # add noise 
 Y     <- sin(X) + rnorm(length(X),sd=.3)
 # approximate function using KRLS
-out <- krls(y=Y,X=X,derivative=TRUE)
+out <- krls(y=Y,X=X)
 # get fitted values and ses
 fit <- predict.krls(out,newdata=X,se.fit=TRUE)
 # results
@@ -173,7 +204,5 @@ krlsout <- krls(X=X,y=y)
 ff  <- function(x1i,x2i,krlsout){predict(object=krlsout,newdata=cbind(x1i,x2i))$fit}
 z   <- outer(x1,x2,ff,krlsout=krlsout)
 persp(x1, x2, z,theta=30,main="KRLS fitted f(x1,x2)")
-
-
 
 }

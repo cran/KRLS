@@ -1,2 +1,2 @@
-export(gausskernel,krls,looloss,predict.krls,solveforc)
+export(gausskernel,krls,looloss,predict.krls,solveforc,summary.krls,plot.krls)
 

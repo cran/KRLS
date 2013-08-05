@@ -4,7 +4,7 @@ function(X=NULL,
               whichkernel="gauss",
               lambda=NULL,
               sigma=NULL,
-              derivative=FALSE,
+              derivative=TRUE,
               print.level=0){
               
       
@@ -32,7 +32,12 @@ function(X=NULL,
       if (n!=nrow(y)){
        stop("nrow(X) not equal to number of elements in y")
       }
-
+         
+      # column names
+      if(is.null(colnames(X))){
+      colnames(X) <- paste("x",1:d,sep="")
+      }
+         
       # scale
       X.init <- X
       X.init.sd <- apply(X.init,2,sd)
@@ -94,6 +99,8 @@ function(X=NULL,
       distances <- X[rows[,1],] - X[ rows[,2],]    # d by n*n matrix of pairwise distances  
       derivmat <- matrix(NA,n,d)
       varavgderivmat <- matrix(NA,1,d)
+      colnames(derivmat)       <- colnames(X)
+      colnames(varavgderivmat) <- colnames(X)
       for(k in 1:d){       
        if(d==1){
              distk <-  matrix(distances,n,n,byrow=TRUE)
@@ -108,6 +115,7 @@ function(X=NULL,
       }
        # avg derivatives
        avgderiv <- matrix(colMeans(derivmat),nrow=1)
+       colnames(avgderiv) <- colnames(X)
       # get back to scale
       derivmat <- scale(y.init.sd*derivmat,center=FALSE,scale=X.init.sd)
       attr(derivmat,"scaled:scale")<- NULL
