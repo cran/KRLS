@@ -1,11 +1,13 @@
 krls <-
-function(X=NULL,
+function(     X=NULL,
               y=NULL,
-              whichkernel="gauss",
+              whichkernel="gaussian",
               lambda=NULL,
               sigma=NULL,
               derivative=TRUE,
-              print.level=0){
+              binary=TRUE,
+              vcov=TRUE,
+              print.level=1){
               
       
       # checks
@@ -32,7 +34,28 @@ function(X=NULL,
       if (n!=nrow(y)){
        stop("nrow(X) not equal to number of elements in y")
       }
-         
+      
+      stopifnot(
+                is.logical(derivative),
+                is.logical(vcov),
+                is.logical(binary)
+                )
+      
+      if(derivative==TRUE){
+        if(vcov==FALSE){
+        stop("derivative==TRUE requires vcov=TRUE")
+        }
+      }
+      
+      # default sigma to dim of X 
+      if(is.null(sigma)) { sigma <- d
+      } else {
+        stopifnot(is.vector(sigma),
+                  length(sigma)==1,
+                  is.numeric(sigma),
+                  sigma>0)        
+      }
+      
       # column names
       if(is.null(colnames(X))){
       colnames(X) <- paste("x",1:d,sep="")
@@ -47,11 +70,9 @@ function(X=NULL,
       X <- scale(X,center=TRUE,scale=X.init.sd)    
       y <- scale(y,center=y.init.mean,scale=y.init.sd)
      
-      # default sigma to dim of X 
-      if(is.null(sigma)) { sigma <- d}
       # kernel matrix
       K <- NULL
-      if(whichkernel=="gauss"){ K <- gausskernel(X,sigma=sigma)}
+      if(whichkernel=="gaussian"){ K <- gausskernel(X,sigma=sigma)}
       if(whichkernel=="linear"){K <- tcrossprod(X)}
       if(whichkernel=="poly2"){K <- (tcrossprod(X)+1)^2}
       if(whichkernel=="poly3"){K <- (tcrossprod(X)+1)^3}
@@ -65,36 +86,52 @@ function(X=NULL,
        # first try with max eigenvalue (increase interval in case of corner solution at upper bound)
        lowerb  <-  .Machine$double.eps
        upperb <- max(Eigenobject$values)
-       if(print.level>0) { cat("Using Leave one out validation to determine lamnda. Search Interval: 0 to",round(upperb,3), "\n")}
+       if(print.level>1) { cat("Using Leave one out validation to determine lamnda. Search Interval: 0 to",round(upperb,3), "\n")}
         lambda <- optimize(looloss,interval=c(lowerb,upperb),y=y,Eigenobject=Eigenobject)$minimum
         if(lambda >= (upperb - .5)){
-         if(print.level>0) { cat("Increasing search window for Lambda that minimizes Loo-Loss \n")}  
+         if(print.level>1) { cat("Increasing search window for Lambda that minimizes Loo-Loss \n")}  
         lambda <- optimize(looloss,interval=c(upperb,2*upperb),y=y,Eigenobject=Eigenobject)$minimum
         }
-        if(print.level>0) { cat("Lambda that minimizes Loo-Loss is:",round(lambda,5),"\n")}    
+        if(print.level>1) { cat("Lambda that minimizes Loo-Loss is:",round(lambda,5),"\n")}    
        } else {  # check user specified lamnbda
-      if (lambda<=0){
-       stop("lambda must be positive")
-      }
+         stopifnot(is.vector(lambda),
+                   length(lambda)==1,
+                   is.numeric(lambda),
+                   lambda>0)  
       }
       # solve given LOO optimal or user specified lambda
       out <-  solveforc(y=y,Eigenobject=Eigenobject,lambda=lambda)
       # fitted values
       yfitted <- K%*%out$coeffs
+      # get back to scale
+      yfitted     <- yfitted*y.init.sd+y.init.mean
+      # R square
+      R2 <- 1-(var(y.init-yfitted)/(y.init.sd^2))
       
       ## var-covar matrix for c
-      # sigma squared
-       sigmasq <- as.vector((1/n) * crossprod(y-yfitted))
-       Gdiag   <-  Eigenobject$values+lambda
-       Ginvsq  <-  tcrossprod(Eigenobject$vectors %*% diag(Gdiag^-2,n,n),Eigenobject$vectors)
-       vcovmatc <- sigmasq*Ginvsq
-      # var-covar for y hats
-       vcovmatyhat <- crossprod(K,vcovmatc%*%K) 
-            
+      if(vcov==TRUE){      
+        # sigma squared
+        sigmasq <- as.vector((1/n) * crossprod(y-yfitted))
+        Gdiag   <-  Eigenobject$values+lambda
+        Ginvsq  <-  tcrossprod(Eigenobject$vectors %*% diag(Gdiag^-2,n,n),Eigenobject$vectors)      
+        vcovmatc <- sigmasq*Ginvsq
+        # var-covar for y hats
+        vcovmatyhat <- crossprod(K,vcovmatc%*%K) 
+        # get back to scale
+        vcov.c      <- (y.init.sd^2)*vcovmatc
+        vcov.fitted <- (y.init.sd^2)*vcovmatyhat
+      } else { 
+        vcov.c      <- NULL
+        vcov.fitted <- NULL
+      }
+                
       # compute derivatives
       derivmat<-NULL
       avgderiv <- derivmat <- varavgderivmat <- NULL
-      if(derivative==TRUE){ 
+      if(derivative==TRUE){
+        if(whichkernel!="gaussian"){
+          stop("derivatives are only available when whichkernel='gaussian' is specified")
+        }
       rows <- cbind(rep(1:nrow(X), each = nrow(X)), 1:nrow(X))
       distances <- X[rows[,1],] - X[ rows[,2],]    # d by n*n matrix of pairwise distances  
       derivmat <- matrix(NA,n,d)
@@ -125,14 +162,11 @@ function(X=NULL,
       attr(varavgderivmat,"scaled:scale")<- NULL
       }
          
-      # get back to scale
-      yfitted     <- yfitted*y.init.sd+y.init.mean
-      vcov.c      <- (y.init.sd^2)*vcovmatc
-      vcov.fitted <- (y.init.sd^2)*vcovmatyhat
       
-      # R square
-      R2 <- 1-(var(y.init-yfitted)/(y.init.sd^2))
-   
+      # indicator for binary predictors
+      binaryindicator=matrix(FALSE,1,d)
+      colnames(binaryindicator) <- colnames(X)
+      
       # return
    z <- list(K=K,
              coeffs=out$coeffs,
@@ -147,12 +181,27 @@ function(X=NULL,
              avgderivatives=avgderiv, 
              var.avgderivatives=varavgderivmat,
              vcov.c=vcov.c,
-             vcov.fitted=vcov.fitted        
-            )
-            
-            
+             vcov.fitted=vcov.fitted,
+             binaryindicator=binaryindicator
+            )          
   class(z) <- "krls"
+    
+  # add first differences if requested
+    if(derivative==TRUE && binary==TRUE){
+      z <- fdskrls(z)
+    }
+  
+  # printing
+      if(print.level>0 && derivative==TRUE){
+      output <- setNames(as.vector(z$avgderivatives), colnames(z$avgderivatives))
+      cat("\n Average Marginal Effects:\n \n")
+      print(output)
+      
+      cat("\n Quartiles of Marginal Effects:\n \n")
+      print(apply(z$derivatives,2,quantile,probs=c(.25,.5,.75)))
+      }
+      
   return(z)
             
-  }
+}
 

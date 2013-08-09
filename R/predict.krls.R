@@ -8,6 +8,12 @@ function(object,newdata,se.fit = FALSE,...)
         return(invisible(NULL))
         }
         
+        if(se.fit==TRUE){
+          if(is.null(object$vcov.c)){
+           stop("recompute krls object with krls(,vcov=TRUE) to compute standart errors") 
+          }
+        }
+        
         # convert to matrix if vector
         #if(is.vector(newdata)){ newdata <- t(as.matrix(newdata))}
         newdata <- as.matrix(newdata)

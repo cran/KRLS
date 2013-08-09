@@ -3,7 +3,7 @@
 plot.krls <-
 function(x,
          which=c(1:2),
-         main="Distributions of pointwise dy/dx",
+         main="distributions of pointwise marginal effects",
          setx="mean",
          ask = prod(par("mfcol")) < nplots,
          nvalues = 50,
@@ -60,8 +60,7 @@ if(2 %in% which){ nplots <- nplots + d}
           print(histogram(form,
                     data=data.frame(x$derivatives),
                     breaks=NULL,
-                    main=main,
-                    scales=list(alternating = FALSE,relation="free")
+                    main=main
                     ,...)
                 )
           #if(length(which)!=1){readline("Press any key for next plot")}

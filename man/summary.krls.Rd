@@ -4,18 +4,16 @@
 Summary method for Kernel-based Regularized Least Squares (KRLS) Model Fits
 }
 \description{
-Summarizes average partial derivatives (i.e. marginal effect) and the distribution of the partial derivatives for each predictor. For binary predictors, the first difference is computed instead of the average partial derivatives.
+Summarizes average partial derivatives (i.e. marginal effects) and the distribution of the partial derivatives for each predictor. For binary predictors, the marginal effects are the first differences if \code{krls(,derivatives=TRUE,binary=TRUE)} was specified.
 }
 \usage{
 
- \method{summary}{krls}(object, binary=TRUE,probs=seq(.25,.75,.25),\dots)
+ \method{summary}{krls}(object, probs=c(.25,.5,.75),\dots)
 }
 \arguments{
   \item{object}{Fitted krls model, i.e. an object of class krls}
   
-\item{binary}{logical flag if first differences, instead of average partial derivatives, should be computed for binary predictors.}
-
-\item{probs}{numeric vector with numbers between 0 and 1 that specify the quantiles of the pointwise marginal effects for the summary.}
+\item{probs}{numeric vector with numbers between 0 and 1 that specify the quantiles of the pointwise marginal effects for the summary (see the \code{\link{quantile}} function for details).}
 
 \item{\dots}{additional arguments to be passed to lower level functions}
 
@@ -29,7 +27,6 @@ Notice that the partial derivatives can only be summarized if the krls object wa
 
   \item{coefficients}{matrix with average partial derivates and or first differences (point estimates, standart errors, t-values, p-values).}
   \item{qcoefficients}{matrix with 1st, 2nd, and 3rd quatriles of distribution of pointwise marinal effects.}
-\item{dydx}{matrix with pointwise partial derivatives where, if binary is set to TRUE, for the binary varibales the pointwise first diferences are reported instead of the partial derivatives.}
 
 }
 
