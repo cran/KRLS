@@ -39,7 +39,7 @@ An \var{N} by \var{N} numeric distance matrix that contains the pairwise distanc
 }
 
 \author{
-Jens Hainmueller (MIT) and Chad Hazlett (MIT)
+Jens Hainmueller (Stanford) and Chad Hazlett (MIT)
 }
 
 \seealso{

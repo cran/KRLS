@@ -29,7 +29,7 @@ Notice that the historgrams for the partial derivatives can only be plotted if t
 
 
 \author{
-Jens Hainmueller (MIT) and Chad Hazlett (MIT)
+Jens Hainmueller (Stanford) and Chad Hazlett (MIT)
 }
 
 \seealso{

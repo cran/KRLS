@@ -32,7 +32,7 @@ Function relies on fast eigenvalue decomposition method described in  method Rif
 Rifkin, Ryan M. and Lippert, Ross A. (2007). Notes on Regularized Least Squares. MIT-CSAIL-TR-2007-025. CBCL-268
 }
 \author{
-Jens Hainmueller (MIT) and Chad Hazlett (MIT)
+Jens Hainmueller (Stanford) and Chad Hazlett (MIT)
 }
 
 \seealso{

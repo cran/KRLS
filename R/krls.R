@@ -7,7 +7,10 @@ function(     X=NULL,
               derivative=TRUE,
               binary=TRUE,
               vcov=TRUE,
-              print.level=1){
+              print.level=1,
+              L=NULL,
+              U=NULL,
+              tol=NULL){
               
       
       # checks
@@ -82,17 +85,26 @@ function(     X=NULL,
       Eigenobject <- eigen(K,symmetric=TRUE)
       # default lamda is chosen by leave one out optimization 
        if(is.null(lambda)) {
+ 
+ #  Old Way to get lambda       
+ # first try with max eigenvalue (increase interval in case of corner solution at upper bound)
+ #   lowerb  <-  .Machine$double.eps
+ #   upperb <- max(Eigenobject$values)
+ #     if(print.level>1) { cat("Using Leave one out validation to determine lamnda. Search Interval: 0 to",round(upperb,3), "\n")}  
+ #     lambda <- optimize(looloss,interval=c(lowerb,upperb),y=y,Eigenobject=Eigenobject)$minimum
+ #     if(lambda >= (upperb - .5)){
+ #       if(print.level>1) { cat("Increasing search window for Lambda that minimizes Loo-Loss \n")}  
+ #      lambda <- optimize(looloss,interval=c(upperb,2*upperb),y=y,Eigenobject=Eigenobject)$minimum
+ #      }
+      # run golden section search
+       if(print.level>2){noisy <- TRUE
+       } else {
+         noisy <- FALSE
+       }   
+       lambda<- lambdasearch(L=L,U=U,y=y,Eigenobject=Eigenobject,noisy=noisy)
+         
+       if(print.level>1) { cat("Lambda that minimizes Loo-Loss is:",round(lambda,5),"\n")}    
        
-       # first try with max eigenvalue (increase interval in case of corner solution at upper bound)
-       lowerb  <-  .Machine$double.eps
-       upperb <- max(Eigenobject$values)
-       if(print.level>1) { cat("Using Leave one out validation to determine lamnda. Search Interval: 0 to",round(upperb,3), "\n")}
-        lambda <- optimize(looloss,interval=c(lowerb,upperb),y=y,Eigenobject=Eigenobject)$minimum
-        if(lambda >= (upperb - .5)){
-         if(print.level>1) { cat("Increasing search window for Lambda that minimizes Loo-Loss \n")}  
-        lambda <- optimize(looloss,interval=c(upperb,2*upperb),y=y,Eigenobject=Eigenobject)$minimum
-        }
-        if(print.level>1) { cat("Lambda that minimizes Loo-Loss is:",round(lambda,5),"\n")}    
        } else {  # check user specified lamnbda
          stopifnot(is.vector(lambda),
                    length(lambda)==1,
@@ -103,10 +115,7 @@ function(     X=NULL,
       out <-  solveforc(y=y,Eigenobject=Eigenobject,lambda=lambda)
       # fitted values
       yfitted <- K%*%out$coeffs
-      # get back to scale
-      yfitted     <- yfitted*y.init.sd+y.init.mean
-      # R square
-      R2 <- 1-(var(y.init-yfitted)/(y.init.sd^2))
+
       
       ## var-covar matrix for c
       if(vcov==TRUE){      
@@ -117,9 +126,7 @@ function(     X=NULL,
         vcovmatc <- sigmasq*Ginvsq
         # var-covar for y hats
         vcovmatyhat <- crossprod(K,vcovmatc%*%K) 
-        # get back to scale
-        vcov.c      <- (y.init.sd^2)*vcovmatc
-        vcov.fitted <- (y.init.sd^2)*vcovmatyhat
+
       } else { 
         vcov.c      <- NULL
         vcov.fitted <- NULL
@@ -162,7 +169,14 @@ function(     X=NULL,
       attr(varavgderivmat,"scaled:scale")<- NULL
       }
          
-      
+      # get back to scale
+      yfitted     <- yfitted*y.init.sd+y.init.mean
+      vcov.c      <- (y.init.sd^2)*vcovmatc
+      vcov.fitted <- (y.init.sd^2)*vcovmatyhat
+      Looe        <- out$Le*y.init.sd
+      # R square
+      R2 <- 1-(var(y.init-yfitted)/(y.init.sd^2))
+            
       # indicator for binary predictors
       binaryindicator=matrix(FALSE,1,d)
       colnames(binaryindicator) <- colnames(X)
@@ -170,7 +184,7 @@ function(     X=NULL,
       # return
    z <- list(K=K,
              coeffs=out$coeffs,
-             Looe=out$Le,
+             Looe=Looe,
              fitted=yfitted,
              X=X.init,
              y=y.init,

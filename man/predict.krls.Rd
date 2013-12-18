@@ -29,6 +29,8 @@ the newdata (ie. the test points). The prediction at a new test point \eqn{x_i} 
 
 where \eqn{K} is the kernel matrix and thus \eqn{K_{x_j}}
 is a vector whose j-th entry is \eqn{K(x_j,x_i)} (e.g. the distance between the test point \eqn{x_i} and the training point \eqn{x_j}). The training points are passed to the function with the krls fit in \code{object}.
+
+When data are missing in \code{newdata} during prediction, the value of each \eqn{k(x_i,x_j)} is computed by using an adjusted Euclidean distance in the kernel definition. Assume \eqn{x} is \var{D}-dimensional but a given pair of observations \eqn{x_i} and \eqn{x_j} have only \eqn{D' < D} non-missing dimensions in common. The adjusted Euclidean distance computes the sum of squared differences over the \eqn{D'} non-missing dimensions, rescales this sum by \eqn{D/D'}, and takes the square root.   The result corresponds to an assumption that conditional on the observed data, the missing values would not have contributed new information predictive of the outcome.
 }
 \value{
 
@@ -41,7 +43,7 @@ is a vector whose j-th entry is \eqn{K(x_j,x_i)} (e.g. the distance between the 
 }
 
 \author{
-Jens Hainmueller (MIT) and Chad Hazlett (MIT)
+Jens Hainmueller (Stanford) and Chad Hazlett (MIT)
 }
 
 \seealso{

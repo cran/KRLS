@@ -19,7 +19,7 @@ A object of class \code{krls} where the derivatives, average derivatives, and th
 replaced with the first differences for binary predictors. The binaryindicator is also updated and set to TRUE for binary predictors.
 }
 \author{
-Jens Hainmueller (MIT) and Chad Hazlett (MIT)
+Jens Hainmueller (Stanford) and Chad Hazlett (MIT)
 }
 
 \seealso{

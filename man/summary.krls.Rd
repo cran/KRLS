@@ -31,7 +31,7 @@ Notice that the partial derivatives can only be summarized if the krls object wa
 }
 
 \author{
-Jens Hainmueller (MIT) and Chad Hazlett (MIT)
+Jens Hainmueller (Stanford) and Chad Hazlett (MIT)
 }
 
 \seealso{

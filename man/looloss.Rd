@@ -25,7 +25,7 @@ Positive scalar value for lamnbda parameter.
 Scalar value for LOO error.
 }
 \author{
-Jens Hainmueller (MIT) and Chad Hazlett (MIT)
+Jens Hainmueller (Stanford) and Chad Hazlett (MIT)
 }
 \seealso{
 \code{\link{krls}}

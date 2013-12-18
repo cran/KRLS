@@ -4,13 +4,13 @@
 Kernel-based Regularized Least Squares (KRLS)
 }
 \description{
-Function that implements Kernel-based Regularized Least Squares (KRLS), a machine learning method described in Hainmueller and Hazlett (2013) that fits flexible solution surfaces of the form y=f(X) that arise in regression or classification problems without relying on linearity, additivity, or other assumptions that use the columns of the predictor matrix X directly as basis functions. KRLS finds the best fitting function by minimizing a Tikhonov regularization problem with a squared loss using Gaussian Kernels as radial basis functions (see details). 
 
+Function implements Kernel-Based Regularized Least Squares (KRLS), a machine learning method described in Hainmueller and Hazlett (2014) that allows users to solve regression and classification problems without manual specification search and strong functional form assumptions. KRLS finds the best fitting function by minimizing a Tikhonov regularization problem with a squared loss, using Gaussian Kernels as radial basis functions. KRLS reduces misspecification bias since it learns the functional form from the data. Yet, it nevertheless allows for interpretability and inference in ways similar to ordinary regression models. In particular, KRLS provides closed-form estimates for the predicted values, variances, and the pointwise partial derivatives that characterize the marginal effects of each independent variable at each data point in the covariate space. The distribution of pointwise marginal effects can be used to examine effect heterogeneity and or interactions. 
 }
 \usage{
 krls(X = NULL, y = NULL, whichkernel = "gaussian", lambda = NULL,
 sigma = NULL, derivative = TRUE, binary= TRUE, vcov=TRUE, 
-print.level = 1)
+print.level = 1,L=NULL,U=NULL,tol=NULL)
 }
 
 \arguments{
@@ -28,7 +28,7 @@ A positive scalar that specifies the \eqn{\lambda}{lambda} parameter for the reg
 }
   \item{sigma}{
 A positive scalar that specifies the bandwidth of the Gaussian kernel (see \code{\link{gausskernel}} for details). 
-By default, the bandwidth is set equal to \var{D} (the number of dimensions) which ensures a reasonable scaling of average distance between observations in the standardized data that is used for the fitting. 
+By default, the bandwidth is set equal to \var{D} (the number of dimensions) which typically yields a reasonable scaling of the distances between observations in the standardized data that is used for the fitting. 
 }
   \item{derivative}{
 Logical that specifies whether pointwise partial derivatives should be computed. Currently, derivatives are only implemented for the Gaussian Kernel.
@@ -43,12 +43,25 @@ Logical that specifies whether variance-covariance matrix for the choice coeffic
 \item{print.level}{
 Positive integer that determines the level of printing. Set to 0 for no printing and 2 for more printing.
 }
+
+\item{L}{
+Non-negative scalar that determines the lower bound of the search window for the leave-one-out optimization to find \eqn{\lambda}{lambda}. Default is \code{NULL} which means that the lower bound is found by using an algorithm outlined in \code{\link{lambdasearch}}.
+}
+
+\item{U}{
+Positive scalar that determines the upper bound of the search window for the leave-one-out optimization to find \eqn{\lambda}{lambda}. Default is \code{NULL} which means that the upper bound is found by using an algorithm outlined in \code{\link{lambdasearch}}.
+}
+
+\item{tol}{
+Positive scalar that determines the tolerance used in the optimization routine used to find \eqn{\lambda}{lambda}. Default is \code{NULL} which means that convergence is achieved when the difference in the sum of squared leave-one-out errors between the \var{i} and the \var{i+1} iteration is less than \var{N * 10^-3}.
+}
+
 }
 \details{
 
-\code{krls} implements the Kernel-based Regularized Least Squares (KRLS) estimator as described in Hainmueller and Hazlett (2013). Please consult this reference for any details.
+\code{krls} implements the Kernel-based Regularized Least Squares (KRLS) estimator as described in Hainmueller and Hazlett (2014). Please consult this reference for any details.
 
-Kernel-based Regularized Least Squares (KRLS) arises as a Tikhonov minimization problem with a squared loss. Assume we have data of the from \eqn{y_i,\,x_i}{y_i, x_i} where \var{i} indexes observations, \eqn{y_i \in R}{y_i in R} is the outcome and \eqn{x_i \in R^D}{x_i in R^D} is a D-dimensional vector of predictor values. Then KRLS searches over a space of functions \eqn{H} and chooses the best fitting function \eqn{f} according to the rule: 
+Kernel-based Regularized Least Squares (KRLS) arises as a Tikhonov minimization problem with a squared loss. Assume we have data of the from \eqn{y_i,\,x_i}{y_i, x_i} where \var{i} indexes observations, \eqn{y_i \in R}{y_i in R} is the outcome and \eqn{x_i \in R^D}{x_i in R^D} is a \var{D}-dimensional vector of predictor values. Then KRLS searches over a space of functions \eqn{H} and chooses the best fitting function \eqn{f} according to the rule: 
 
 \deqn{argmin_{f \in H} \sum_i^N (y_i - f(x_i))^2 + \lambda ||f||_{H^2}}{%
       argmin_{f in H} sum_i^N (y_i - f(x_i))^2 + lambda || f ||_H^2} 
@@ -72,7 +85,7 @@ Accordingly, the \code{krls} function solves the following minimization problem
 
 which is convex in \eqn{c} and solved by \eqn{c=(K +\lambda I)^-1 y}{c=(K +lambda I)^-1 y} where \eqn{I} is the identity matrix. Note that this linear solution provides a flexible fitted response surface that typically reduces misspecification bias because it can learn a wide range of nonlinear and or nonadditive functions of the predictors. 
 
-If \code{vcov=TRUE} is specified, \code{krls} also computes the variance-covariance matrix for the choice coefficients \eqn{c} and fitted values \eqn{y=Kc} based on a variance estimator developed in Hainmueller and Hazlett (2013). Note that both matrices are \var{N} by \var{N} and therefore this results in increased memory and computing time.
+If \code{vcov=TRUE} is specified, \code{krls} also computes the variance-covariance matrix for the choice coefficients \eqn{c} and fitted values \eqn{y=Kc} based on a variance estimator developed in Hainmueller and Hazlett (2014). Note that both matrices are \var{N} by \var{N} and therefore this results in increased memory and computing time.
 
 By default, \code{krls} uses the Gaussian Kernel (\code{whichkernel = "gaussian"}) given by 
 
@@ -82,9 +95,9 @@ By default, \code{krls} uses the Gaussian Kernel (\code{whichkernel = "gaussian"
 where \eqn{||x_i - x_j||} is the Euclidean distance. The kernel bandwidth \eqn{\sigma^2}{sigma^2} is set to \eqn{D}, the number of dimensions, by default, but the user can also specify other values using the \code{sigma} argument to implement other approaches. 
 
 
-If \code{derivative=TRUE} is specified, \code{krls} also computes the pointwise partial derivatives of the fitted function wrt to each predictor using the estimators developed in Hainmueller and Hazlett (2013). These can be used to examine the marginal effects of each predictor and how they marginal effects vary across the covariate space. Average derivatives are also computed with variances. Note that the \code{derivative=TRUE} option results in increased computing time and is only supported for the Gaussian kernel, i.e. when \code{whichkernel = "gaussian"}. Also \code{derivative=TRUE} requires that \code{vcov=TRUE}. 
+If \code{derivative=TRUE} is specified, \code{krls} also computes the pointwise partial derivatives of the fitted function wrt to each predictor using the estimators developed in Hainmueller and Hazlett (2014). These can be used to examine the marginal effects of each predictor and how the marginal effects vary across the covariate space. Average derivatives are also computed with variances. Note that the \code{derivative=TRUE} option results in increased computing time and is only supported for the Gaussian kernel, i.e. when \code{whichkernel = "gaussian"}. Also \code{derivative=TRUE} requires that \code{vcov=TRUE}. 
 
-If \code{binary=TRUE} is also specified, the function will identify binary predictors and return first differences for these predictors instead of partial derivatives. First differences are computed going from the minimum to the maximum value of each binary predictor. Note that first differences are more appropriate to summarize the effects for binary predictors (see Hainmueller and Hazlett (2013) for details). 
+If \code{binary=TRUE} is also specified, the function will identify binary predictors and return first differences for these predictors instead of partial derivatives. First differences are computed going from the minimum to the maximum value of each binary predictor. Note that first differences are more appropriate to summarize the effects for binary predictors (see Hainmueller and Hazlett (2014) for details). 
 
 A few other kernels are also implemented, but derivatives are currently not supported for these: "linear": \eqn{k(x_i,x_j)=x_i'x_j}, "poly1", "poly2", "poly3", "poly4" are polynomial kernels based on  \eqn{k(x_i,x_j)=(x_i'x_j +1)^p} where \eqn{p} is the order.
 
@@ -93,7 +106,7 @@ A few other kernels are also implemented, but derivatives are currently not supp
 A list object of class \code{krls} with the following elements:
   \item{K}{\var{N} by \var{N} matrix of pairwise kernel distances between observations.}
   \item{coeffs }{\var{N} by 1 vector of choice coefficients \var{c}.}
-  \item{Le}{scalar with sum of squared leave-one-out error.}
+  \item{Le}{scalar with sum of squared leave-one-out errors.}
   \item{fitted}{\var{N} by 1 vector of fitted values.}
   \item{X}{original \var{N} by \var{D} predictor data matrix.}
   \item{y}{original \var{N} by 1 matrix of values of the outcome variable.} 
@@ -110,12 +123,11 @@ A list object of class \code{krls} with the following elements:
   }
 \references{
 
-Hainmueller, J. and Hazlett, C. 2013. Kernel Regularized Least Squares: Moving Beyond Linearity and Additivity Without Sacrifcing Interpretability. Working Paper MIT \url{http://dx.doi.org/10.2139/ssrn.2046206}.
+Hainmueller, J. and Hazlett, C. 2014.Kernel Regularized Least Squares: Reducing Misspecification Bias with a Flexible and Interpretable Machine Learning Approach. Political Analysis. (Forthcoming).
 
 Rifkin, R. 2002. Everything Old is New Again: A fresh look at historical approaches in machine learning. Thesis, MIT. September, 2002.
 
-Evgeniou, T., Pontil, M., and Poggio, T. (2000). Regularization networks and support vector
-machines. Advances In Computational Mathematics, 13(1):1-50.
+Evgeniou, T., Pontil, M., and Poggio, T. (2000). Regularization networks and support vector machines. Advances In Computational Mathematics, 13(1):1-50.
 
 Schoelkopf, B., Herbrich, R. and Smola, A.J. (2001) A generalized representer theorem. In 14th Annual
 Conference on Computational Learning Theory, pages 416-426.
@@ -124,7 +136,7 @@ Kimeldorf, G.S. Wahba, G. 1971. Some results on Tchebycheffian spline functions.
 
 }
 \author{
-Jens Hainmueller (MIT) and Chad Hazlett (MIT)
+Jens Hainmueller (Stanford) and Chad Hazlett (MIT)
 }
 \note{
 The function requires the storage of a \var{N} by \var{N} kernel matrix and can therefore exceed the memory limits for very large datasets.
