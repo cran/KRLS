@@ -13,7 +13,8 @@ lambdasearch(L=NULL,
            y=NULL,
            Eigenobject=NULL,
            tol=NULL,
-           noisy=FALSE)
+           noisy=FALSE,
+           eigtrunc=NULL)
 }
 \arguments{
   \item{L}{Non-negative scalar that determines the lower bound of the search window. Default is \code{NULL} which means that the lower bound is found using an algorithm (see details).}
@@ -22,6 +23,9 @@ lambdasearch(L=NULL,
 \item{Eigenobject}{List that contains the eigenvalues and eigenvectors of the kernel matrix \var{K}.}
 \item{tol}{Positive scalar that determines the tolerance used in the optimization routine used to find \eqn{\lambda}{lambda}. Default is \code{NULL} which means that convergence is achieved when the difference in the sum of squared leave-one-out errors between the \code{i} and the \code{i+1} iteration is less than \code{N * 10^-3}.}
 \item{noisy}{If \code{TRUE}, the function will print details of the golden section search.}
+\item{eigtrunc}{
+Positive scalar value that determines truncation of eigenvalues for lamnda search window. See \code{\link{krls}} for details. Default is \code{NULL} which means no truncation.
+}
 }
 \details{
 

@@ -4,7 +4,8 @@ lambdasearch <-
            y=NULL,
            Eigenobject=NULL,
            tol=NULL,
-           noisy=FALSE){
+           noisy=FALSE,
+  				 eigtrunc=NULL){
     
     n <- nrow(y)  
     if(is.null(tol)){
@@ -20,7 +21,7 @@ lambdasearch <-
     if(is.null(U)){
     U <- n
     while(sum(Eigenobject$values / (Eigenobject$values + U)) < 1){
-      U <- U-1      
+      U <- U-1    
      }
     } else {
       stopifnot(is.vector(U),
@@ -32,7 +33,10 @@ lambdasearch <-
   # get lower bound starting value
     if(is.null(L)){
       q <- which.min(abs(Eigenobject$values - (max(Eigenobject$values)/1000)))    
-      L <- 0
+      
+      #L <- 0
+      L = .Machine$double.eps  #CJH: to avoid Inf in next statement
+      
       while(sum(Eigenobject$values / (Eigenobject$values + L)) > q){
         L <- L+.05    
       }
@@ -48,8 +52,8 @@ lambdasearch <-
     X2 <- U - (.381966)*(U-L)
     
     # starting LOO losses
-    S1 <- looloss(lambda=X1,y=y,Eigenobject=Eigenobject)
-    S2 <- looloss(lambda=X2,y=y,Eigenobject=Eigenobject)
+    S1 <- looloss(lambda=X1,y=y,Eigenobject=Eigenobject, eigtrunc=eigtrunc)
+    S2 <- looloss(lambda=X2,y=y,Eigenobject=Eigenobject, eigtrunc=eigtrunc)
   
     if(noisy){cat("L:",L,"X1:",X1,"X2:",X2,"U:",U,"S1:",S1,"S2:",S2,"\n") }
     
@@ -61,14 +65,14 @@ lambdasearch <-
         X2 <- X1
         X1 <- L + (.381966)*(U-L)
         S2 <- S1
-        S1 <- looloss(lambda=X1,y=y,Eigenobject=Eigenobject)
+        S1 <- looloss(lambda=X1,y=y,Eigenobject=Eigenobject, eigtrunc=eigtrunc)
         
        } else { #S2 < S1
         L  <- X1
         X1 <- X2
         X2 <- U - (.381966)*(U-L)
         S1 <- S2
-        S2 <- looloss(lambda=X2,y=y,Eigenobject=Eigenobject)
+        S2 <- looloss(lambda=X2,y=y,Eigenobject=Eigenobject,eigtrunc=eigtrunc)
        }
 
       if(noisy){cat("L:",L,"X1:",X1,"X2:",X2,"U:",U,"S1:",S1,"S2:",S2,"\n") }

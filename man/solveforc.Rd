@@ -8,7 +8,8 @@ Internal function that computes choice coefficients for KRLS given a fixed value
 This function is called internally by \code{\link{krls}}. It would normally not be called by the user directly.
 }
 \usage{
-solveforc(y = NULL, Eigenobject = NULL, lambda = NULL)
+solveforc(y = NULL, Eigenobject = NULL,
+lambda = NULL,eigtrunc=NULL)
 }
 \arguments{
   \item{y}{
@@ -20,6 +21,12 @@ Object from call to \code{\link{eigen}} that contains spectral decomposition of 
   \item{lambda}{
 Positive scalar value for lamnbda parameter.
 }
+
+\item{eigtrunc}{
+Positive scalar value that determines truncation of eigenvalues for lamnda search window. See \code{\link{krls}} for details. Default is \code{NULL} which means no truncation.
+}
+
+
 }
 \details{
 Function relies on fast eigenvalue decomposition method described in  method Rifkin and Lippert (2007).

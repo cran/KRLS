@@ -10,19 +10,22 @@ function(     X=NULL,
               print.level=1,
               L=NULL,
               U=NULL,
-              tol=NULL){
+              tol=NULL,
+							eigtrunc=NULL){
               
-      
       # checks
       y <- as.matrix(y)
       X <- as.matrix(X)
       
       if (is.numeric(X)==FALSE){
        stop("X must be numeric")
-      }
+      }      
       if (is.numeric(y)==FALSE){
        stop("y must be numeric")
       }
+      if (sd(y)==0) {
+        stop("y is a constant")        
+      }  
        if (sum(is.na(X))>0){
        stop("X contains missing data")
       }
@@ -32,6 +35,15 @@ function(     X=NULL,
       if (var(y)==0){
        stop("y does not vary")
       }
+      
+      if (!is.null(eigtrunc)){
+          if (!is.numeric(eigtrunc)) stop("eigtrunc, if used, must be numeric")    
+          if (eigtrunc>1 | eigtrunc<0) stop("eigtrunc must be between 0 and 1")
+          if (eigtrunc==0) {
+            eigtrunc=NULL
+            warning("eigtrunc of 0 equivalent to no eigen truncation")}
+      }
+      
       n <- nrow(X)
       d <- ncol(X)
       if (n!=nrow(y)){
@@ -60,13 +72,16 @@ function(     X=NULL,
       }
       
       # column names
-      if(is.null(colnames(X))){
+      if (is.null(colnames(X))) {
       colnames(X) <- paste("x",1:d,sep="")
       }
          
       # scale
       X.init <- X
       X.init.sd <- apply(X.init,2,sd)
+      if (sum(X.init.sd==0)) {
+        stop("at least one column in X is a constant, please remove the constant(s)")
+      }      
       y.init <- y
       y.init.sd <- apply(y.init,2,sd)
       y.init.mean <- mean(y.init)
@@ -81,8 +96,13 @@ function(     X=NULL,
       if(whichkernel=="poly3"){K <- (tcrossprod(X)+1)^3}
       if(whichkernel=="poly4"){K <- (tcrossprod(X)+1)^4}
       if(is.null(K)){stop("No valid Kernel specified")}
+      
       # eigenvalue decomposition
+      Eigenobject=list()
+      Eigenobject$values=numeric(length=n)
+      Eigenobject$vectors=matrix(NA,n,n)
       Eigenobject <- eigen(K,symmetric=TRUE)
+      
       # default lamda is chosen by leave one out optimization 
        if(is.null(lambda)) {
  
@@ -101,31 +121,53 @@ function(     X=NULL,
        } else {
          noisy <- FALSE
        }   
-       lambda<- lambdasearch(L=L,U=U,y=y,Eigenobject=Eigenobject,noisy=noisy)
+       lambda<- lambdasearch(L=L,U=U,y=y,Eigenobject=Eigenobject,eigtrunc=eigtrunc,noisy=noisy)
          
        if(print.level>1) { cat("Lambda that minimizes Loo-Loss is:",round(lambda,5),"\n")}    
        
-       } else {  # check user specified lamnbda
+       } else {  # check user specified lambda
          stopifnot(is.vector(lambda),
                    length(lambda)==1,
                    is.numeric(lambda),
                    lambda>0)  
       }
       # solve given LOO optimal or user specified lambda
-      out <-  solveforc(y=y,Eigenobject=Eigenobject,lambda=lambda)
-      # fitted values
+      out <-  solveforc(y=y,Eigenobject=Eigenobject,lambda=lambda,eigtrunc=eigtrunc)
+      
+ #Now, if eigtrunc was used, maybe we should also reconstruct K using those eigenvalues?
+ #if (!is.null(eigtrunc)){	
+ #lastkeeper=max(which(Eigenobject$values>=eigtrunc*Eigenobject$values[1]))	
+ #K <- tcrossprod(multdiag(X=Eigenobject$vectors[,1:lastkeeper],d=Eigenobject$values[1:lastkeeper]),Eigenobject$vectors[,1:lastkeeper])        
+ #}
+
+ # fitted values
       yfitted <- K%*%out$coeffs
 
-      
       ## var-covar matrix for c
       if(vcov==TRUE){      
         # sigma squared
         sigmasq <- as.vector((1/n) * crossprod(y-yfitted))
-        Gdiag   <-  Eigenobject$values+lambda
-        Ginvsq  <-  tcrossprod(Eigenobject$vectors %*% diag(Gdiag^-2,n,n),Eigenobject$vectors)      
-        vcovmatc <- sigmasq*Ginvsq
-        # var-covar for y hats
-        vcovmatyhat <- crossprod(K,vcovmatc%*%K) 
+        #Gdiag   <-  Eigenobject$values+lambda
+        #Ginvsq  <-  tcrossprod(Eigenobject$vectors %*% diag(Gdiag^-2,n,n),Eigenobject$vectors)  
+        #Faster:
+        #Ginvsq <- tcrossprod(multdiag(X=Eigenobject$vectors,d=Gdiag^-2),Eigenobject$vectors)
+
+        # Faster still: skip creating Ginvsq and multiply by sigmasq at same time
+        vcovmatc <- matrix(NA,n,n)
+        
+        if (is.null(eigtrunc)){	
+        	vcovmatc <- tcrossprod(multdiag(X=Eigenobject$vectors,d=sigmasq*(Eigenobject$values+lambda)^-2),Eigenobject$vectors)        
+        } else{
+        	
+        	#eigentruncation: keep only eigenvectors at least 'eigtrunc' times as large as the largest
+        	lastkeeper=max(which(Eigenobject$values>=eigtrunc*Eigenobject$values[1]))	
+        	vcovmatc <- tcrossprod(multdiag(X=Eigenobject$vectors[,1:lastkeeper],d=sigmasq*(Eigenobject$values[1:lastkeeper]+lambda)^-2),Eigenobject$vectors[,1:lastkeeper])        
+        }
+        
+        #vcovmatc <- sigmasq*Ginvsq
+        
+				# var-covar for y hats
+				vcovmatyhat <- crossprod(K,vcovmatc%*%K) 
 
       } else { 
         vcov.c      <- NULL
@@ -133,18 +175,21 @@ function(     X=NULL,
       }
                 
       # compute derivatives
-      derivmat<-NULL
-      avgderiv <- derivmat <- varavgderivmat <- NULL
-      if(derivative==TRUE){
+      avgderiv <- varavgderivmat <- derivmat <- NULL
+   
+ 			if(derivative==TRUE){
         if(whichkernel!="gaussian"){
           stop("derivatives are only available when whichkernel='gaussian' is specified")
         }
+        
+      derivmat<-matrix(NA,n,d)
+      varavgderivmat<- avgderivmat <- matrix(NA,1,d)
+        
       rows <- cbind(rep(1:nrow(X), each = nrow(X)), 1:nrow(X))
       distances <- X[rows[,1],] - X[ rows[,2],]    # d by n*n matrix of pairwise distances  
-      derivmat <- matrix(NA,n,d)
-      varavgderivmat <- matrix(NA,1,d)
       colnames(derivmat)       <- colnames(X)
       colnames(varavgderivmat) <- colnames(X)
+      
       for(k in 1:d){       
        if(d==1){
              distk <-  matrix(distances,n,n,byrow=TRUE)
@@ -171,8 +216,13 @@ function(     X=NULL,
          
       # get back to scale
       yfitted     <- yfitted*y.init.sd+y.init.mean
-      vcov.c      <- (y.init.sd^2)*vcovmatc
-      vcov.fitted <- (y.init.sd^2)*vcovmatyhat
+       if(vcov==TRUE){  
+           vcov.c      <- (y.init.sd^2)*vcovmatc
+           vcov.fitted <- (y.init.sd^2)*vcovmatyhat
+       } else {
+         vcov.c      <- NULL
+         vcov.fitted <- NULL
+      }
       Looe        <- out$Le*y.init.sd
       # R square
       R2 <- 1-(var(y.init-yfitted)/(y.init.sd^2))

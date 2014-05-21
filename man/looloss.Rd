@@ -8,7 +8,8 @@ Internal function that computes Leave-On-Out (LOO) Error for KRLS given a fixed 
 This function is called internally by \code{krls} to find value of lambda that minimizes the LOO error. It would normally not be called by the user directly.
 }
 \usage{
-looloss(y = NULL, Eigenobject = NULL, lambda = NULL)
+looloss(y = NULL, Eigenobject = NULL,
+lambda = NULL,eigtrunc=NULL)
 }
 \arguments{
   \item{y}{
@@ -19,6 +20,10 @@ Object from call to \code{eigen} that contains spectral decomposition of the n b
 }
   \item{lambda}{
 Positive scalar value for lamnbda parameter.
+}
+
+\item{eigtrunc}{
+Positive scalar value that determines truncation of eigenvalues for lamnda search window. See \code{\link{krls}} for details. Default is \code{NULL} which means no truncation.
 }
 }
 \value{

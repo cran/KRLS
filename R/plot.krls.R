@@ -1,5 +1,3 @@
-
-
 plot.krls <-
 function(x,
          which=c(1:2),

@@ -10,12 +10,12 @@ Function implements Kernel-Based Regularized Least Squares (KRLS), a machine lea
 \usage{
 krls(X = NULL, y = NULL, whichkernel = "gaussian", lambda = NULL,
 sigma = NULL, derivative = TRUE, binary= TRUE, vcov=TRUE, 
-print.level = 1,L=NULL,U=NULL,tol=NULL)
+print.level = 1,L=NULL,U=NULL,tol=NULL,eigtrunc=NULL)
 }
 
 \arguments{
   \item{X}{
-\var{N} by \var{D} data numeric matrix that contains the values of \var{D} predictor variables for \eqn{i=1,\ldots,N} observations. The matrix may not contain missing values. 
+\var{N} by \var{D} data numeric matrix that contains the values of \var{D} predictor variables for \eqn{i=1,\ldots,N} observations. The matrix may not contain missing values or constants. Note that no intercept is required since the function operates on demeaned data and subtracting the mean of \var{y} is equivalent to including an (unpenalized) intercept into the model.
 }
   \item{y}{
 \var{N} by \var{1} data numeric matrix or vector that contains the values of the response variable for all observations. This vector may not contain missing values. 
@@ -54,6 +54,10 @@ Positive scalar that determines the upper bound of the search window for the lea
 
 \item{tol}{
 Positive scalar that determines the tolerance used in the optimization routine used to find \eqn{\lambda}{lambda}. Default is \code{NULL} which means that convergence is achieved when the difference in the sum of squared leave-one-out errors between the \var{i} and the \var{i+1} iteration is less than \var{N * 10^-3}.
+}
+
+\item{eigtrunc}{
+Positive scalar that determines how much eignvalues should be trunacted for finding the upper bound of the search window in the algorithm outlined in \code{\link{lambdasearch}}. If \code{eigtrunc} is set to \var{10^-6} this means that we keep only eigenvalues that are \var{10^-6} as large as the first. Default is \code{eigtrunc=NULL} which means no truncation is used. 
 }
 
 }
