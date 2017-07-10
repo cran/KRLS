@@ -127,14 +127,16 @@ A list object of class \code{krls} with the following elements:
   }
 \references{
 
-Hainmueller, J. and Hazlett, C. 2014.Kernel Regularized Least Squares: Reducing Misspecification Bias with a Flexible and Interpretable Machine Learning Approach. Political Analysis. (Forthcoming).
+Jeremy Ferwerda, Jens Hainmueller, Chad J. Hazlett (2017). Kernel-Based Regularized Least Squares in {R} ({KRLS}) and {Stata} ({krls}).
+ Journal of Statistical Software, 79(3), 1-26. doi:10.18637/jss.v079.i03
+  
+Hainmueller, J. and Hazlett, C. (2014). Kernel Regularized Least Squares: Reducing Misspecification Bias with a Flexible and Interpretable Machine Learning Approach. Political Analysis, 22(2)
 
 Rifkin, R. 2002. Everything Old is New Again: A fresh look at historical approaches in machine learning. Thesis, MIT. September, 2002.
 
 Evgeniou, T., Pontil, M., and Poggio, T. (2000). Regularization networks and support vector machines. Advances In Computational Mathematics, 13(1):1-50.
 
-Schoelkopf, B., Herbrich, R. and Smola, A.J. (2001) A generalized representer theorem. In 14th Annual
-Conference on Computational Learning Theory, pages 416-426.
+Schoelkopf, B., Herbrich, R. and Smola, A.J. (2001) A generalized representer theorem. In 14th Annual Conference on Computational Learning Theory, pages 416-426.
 
 Kimeldorf, G.S. Wahba, G. 1971. Some results on Tchebycheffian spline functions. Journal of Mathematical Analysis and Applications, 33:82-95.
 

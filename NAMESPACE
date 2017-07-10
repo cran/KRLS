@@ -1,2 +1,9 @@
 export(gausskernel,krls,looloss,predict.krls,solveforc,summary.krls,plot.krls)
-
+importFrom("grDevices", "devAskNewPage")
+     importFrom("graphics", "arrows", "par", "plot")
+     importFrom("stats", "as.formula", "dist", "predict", "pt", "quantile",
+     "sd", "setNames", "var")
+     
+S3method(plot, krls)
+S3method(predict, krls)
+S3method(summary, krls)

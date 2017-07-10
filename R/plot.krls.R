@@ -53,9 +53,11 @@ if(2 %in% which){ nplots <- nplots + d}
          
           if(1 %in% which){ # histograms of partial derivatives
           form <-  as.formula(paste("~",paste(colnames(x$derivatives),collapse="+"),sep=""))
-          require(lattice)
           
-          print(histogram(form,
+          #require(lattice)
+          requireNamespace("lattice", quietly = TRUE)
+          
+          print(lattice::histogram(form,
                     data=data.frame(x$derivatives),
                     breaks=NULL,
                     main=main

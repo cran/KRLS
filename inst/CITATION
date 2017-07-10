@@ -1,0 +1,24 @@
+bibentry(bibtype = "Article",
+  title        = "Kernel-Based Regularized Least Squares in {R} ({KRLS}) and {Stata} ({krls})",
+  author       = c(person(given = "Jeremy",
+                          family = "Ferwerda"),
+                   person(given = "Jens",
+                          family = "Hainmueller",
+                          email = "jhain@stanford.edu"),
+                   person(given = c("Chad", "J."),
+                          family = "Hazlett")),
+  journal      = "Journal of Statistical Software",
+  year         = "2017",
+  volume       = "79",
+  number       = "3",
+  pages        = "1--26",
+  doi          = "10.18637/jss.v079.i03",
+
+  header       = "To cite KRLS in publications use:",
+  textVersion  =
+  paste("Jeremy Ferwerda, Jens Hainmueller, Chad J. Hazlett (2017).",
+        "Kernel-Based Regularized Least Squares in R (KRLS) and Stata (krls)",
+        "Journal of Statistical Software, 79(3), 1-26.",
+        "doi:10.18637/jss.v079.i03")
+)
+
