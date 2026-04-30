@@ -234,4 +234,7 @@ persp(x1, x2, z,theta=30,main="KRLS fitted f(x1,x2)")
 
 }
 
- \keyword{multivariate, smooth, kernels, machine learning, regression, classification}
+ \keyword{multivariate}
+\keyword{smooth}
+\keyword{regression}
+\keyword{classification}

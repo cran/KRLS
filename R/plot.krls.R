@@ -9,10 +9,8 @@ function(x,
          ...)
       {
             
-        if( class(x)!= "krls" ){
-        warning("x not of class 'krls'")
-        UseMethod("summary")
-        return(invisible(NULL))
+        if (!inherits(x, "krls")) {
+          stop("x is not of class 'krls'")
         }
      
         d <- ncol(x$X)

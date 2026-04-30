@@ -51,9 +51,10 @@ lambdasearch <-
     X1 <- L + (.381966)*(U-L)
     X2 <- U - (.381966)*(U-L)
     
-    # starting LOO losses
-    S1 <- looloss(lambda=X1,y=y,Eigenobject=Eigenobject, eigtrunc=eigtrunc)
-    S2 <- looloss(lambda=X2,y=y,Eigenobject=Eigenobject, eigtrunc=eigtrunc)
+    # starting LOO losses (cast to scalar; looloss/solveforc returns a 1x1 matrix
+    # whose recycling against length-n vectors triggers R 4.4+ deprecation warnings)
+    S1 <- as.numeric(looloss(lambda = X1, y = y, Eigenobject = Eigenobject, eigtrunc = eigtrunc))
+    S2 <- as.numeric(looloss(lambda = X2, y = y, Eigenobject = Eigenobject, eigtrunc = eigtrunc))
   
     if(noisy){cat("L:",L,"X1:",X1,"X2:",X2,"U:",U,"S1:",S1,"S2:",S2,"\n") }
     
@@ -65,23 +66,20 @@ lambdasearch <-
         X2 <- X1
         X1 <- L + (.381966)*(U-L)
         S2 <- S1
-        S1 <- looloss(lambda=X1,y=y,Eigenobject=Eigenobject, eigtrunc=eigtrunc)
-        
+        S1 <- as.numeric(looloss(lambda = X1, y = y, Eigenobject = Eigenobject, eigtrunc = eigtrunc))
+
        } else { #S2 < S1
         L  <- X1
         X1 <- X2
         X2 <- U - (.381966)*(U-L)
         S1 <- S2
-        S2 <- looloss(lambda=X2,y=y,Eigenobject=Eigenobject,eigtrunc=eigtrunc)
+        S2 <- as.numeric(looloss(lambda = X2, y = y, Eigenobject = Eigenobject, eigtrunc = eigtrunc))
        }
 
       if(noisy){cat("L:",L,"X1:",X1,"X2:",X2,"U:",U,"S1:",S1,"S2:",S2,"\n") }
     }
-    out <- ifelse(S1<S2,X1,X2)
-    if(noisy){cat("Lambda:",out,"\n")}  
+    out <- if (S1 < S2) X1 else X2
+    if (noisy) cat("Lambda:", out, "\n")
     return(invisible(out))
 }
-
-
-#lambdasearch(L=NULL,U=NULL,y=y,Eigenobject=Eigenobject)
 

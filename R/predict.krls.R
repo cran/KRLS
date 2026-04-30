@@ -2,20 +2,16 @@ predict.krls <-
 function(object,newdata,se.fit = FALSE,...)
       {
             
-        if( class(object)!= "krls" ){
-        warning("Object not of class 'krls'")
-        UseMethod("predict")
-        return(invisible(NULL))
+        if (!inherits(object, "krls")) {
+          stop("object is not of class 'krls'")
         }
-        
-        if(se.fit==TRUE){
-          if(is.null(object$vcov.c)){
-           stop("recompute krls object with krls(,vcov=TRUE) to compute standart errors") 
+
+        if (isTRUE(se.fit)) {
+          if (is.null(object$vcov.c)) {
+            stop("refit with krls(..., vcov = TRUE) to compute standard errors")
           }
         }
-        
-        # convert to matrix if vector
-        #if(is.vector(newdata)){ newdata <- t(as.matrix(newdata))}
+
         newdata <- as.matrix(newdata)
         # dimension check      
         if(ncol(object$X)!=ncol(newdata)){

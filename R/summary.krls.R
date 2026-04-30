@@ -2,10 +2,8 @@ summary.krls <-
 function(object, probs=c(.25,.5,.75),...)
       {
             
-        if( class(object)!= "krls" ){
-        warning("Object not of class 'krls'")
-        UseMethod("summary")
-        return(invisible(NULL))
+        if (!inherits(object, "krls")) {
+          stop("object is not of class 'krls'")
         }
         
         cat("* *********************** *\n")
