@@ -12,9 +12,9 @@ solveforc <- function(y = NULL, Eigenobject = NULL, lambda = NULL, eigtrunc = NU
     # We need at least one.
     lastkeeper <- max(1, lastkeeper)
 
-    Ginv <- tcrossprod(multdiag(X = Eigenobject$vectors[, 1:lastkeeper],
+    Ginv <- tcrossprod(multdiag(X = Eigenobject$vectors[, 1:lastkeeper, drop = FALSE],
                                 d = 1 / (Eigenobject$values[1:lastkeeper] + lambda)),
-                       Eigenobject$vectors[, 1:lastkeeper])
+                       Eigenobject$vectors[, 1:lastkeeper, drop = FALSE])
   }
 
   coeffs <- tcrossprod(Ginv, t(y))

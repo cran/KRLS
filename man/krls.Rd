@@ -9,16 +9,27 @@ Function implements Kernel-Based Regularized Least Squares (KRLS), a machine lea
 }
 \usage{
 krls(X = NULL, y = NULL, whichkernel = "gaussian", lambda = NULL,
-sigma = NULL, derivative = TRUE, binary= TRUE, vcov=TRUE, 
-print.level = 1,L=NULL,U=NULL,tol=NULL,eigtrunc=NULL)
+sigma = NULL, derivative = TRUE, binary= TRUE, vcov=TRUE,
+print.level = 1,L=NULL,U=NULL,tol=NULL,eigtrunc=NULL,data=NULL,
+approx = c("auto", "none", "nystrom"), nystrom_m = NULL,
+landmarks = NULL, landmark_method = c("random", "kmeans"),
+nystrom_eps = sqrt(.Machine$double.eps),
+landmark_seed = NULL,
+lambda_method = c("loo", "gcv"),
+cat_columns = NULL)
 }
 
 \arguments{
   \item{X}{
-\var{N} by \var{D} data numeric matrix that contains the values of \var{D} predictor variables for \eqn{i=1,\ldots,N} observations. The matrix may not contain missing values or constants. Note that no intercept is required since the function operates on demeaned data and subtracting the mean of \var{y} is equivalent to including an (unpenalized) intercept into the model.
+For the matrix interface (the original): an \var{N} by \var{D} numeric data matrix that contains the values of \var{D} predictor variables for \eqn{i=1,\ldots,N} observations. The matrix may not contain missing values or constants. Note that no intercept is required since the function operates on demeaned data and subtracting the mean of \var{y} is equivalent to including an (unpenalized) intercept into the model.
+
+For the formula interface (added in 1.2-0): a two-sided formula of the form \code{y ~ x1 + x2 + ...} with the response on the left-hand side and the covariates on the right. \code{data} must be supplied. The intercept column is dropped automatically. Both interfaces produce the same fit; the formula form is purely an ergonomic wrapper.
 }
   \item{y}{
-\var{N} by \var{1} data numeric matrix or vector that contains the values of the response variable for all observations. This vector may not contain missing values. 
+\var{N} by \var{1} data numeric matrix or vector that contains the values of the response variable for all observations. This vector may not contain missing values. Ignored when \code{X} is a formula (the response is taken from the formula).
+}
+  \item{data}{
+For the formula interface: a \code{data.frame} containing the variables referenced in the formula. Required when \code{X} is a formula; ignored otherwise.
 }
   \item{whichkernel}{
 String vector that specifies which kernel should be used. Must be one of \code{gaussian}, \code{linear}, \code{poly1}, \code{poly2}, \code{poly3}, or \code{poly4} (see details). Default is \code{gaussian}.
@@ -27,8 +38,9 @@ String vector that specifies which kernel should be used. Must be one of \code{g
 A positive scalar that specifies the \eqn{\lambda}{lambda} parameter for the regularizer (see details). It governs the tradeoff between model fit and complexity. By default, this parameter is chosen by minimizing the sum of the squared leave-one-out errors.
 }
   \item{sigma}{
-A positive scalar that specifies the bandwidth of the Gaussian kernel (see \code{\link{gausskernel}} for details). 
-By default, the bandwidth is set equal to \var{D} (the number of dimensions) which typically yields a reasonable scaling of the distances between observations in the standardized data that is used for the fitting. 
+A positive scalar that specifies the bandwidth of the Gaussian kernel (see \code{\link{gausskernel}} for details).
+
+\strong{Default changed in 1.7-0.} When \code{sigma = NULL}, \code{krls()} now selects the bandwidth that maximizes the off-diagonal variance of the kernel matrix \var{K} (see \code{\link{b_maxvarK}}), matching the convention used by \code{kbal::b_maxvarK} and \code{gpss}. The pre-1.7 default was \code{sigma = ncol(X_processed)}; pin that value explicitly to reproduce older fits. A one-line \code{message()} is emitted on the first call where the new default kicks in.
 }
   \item{derivative}{
 Logical that specifies whether pointwise partial derivatives should be computed. Currently, derivatives are only implemented for the Gaussian Kernel.
@@ -36,8 +48,8 @@ Logical that specifies whether pointwise partial derivatives should be computed.
   \item{binary}{
 Logical that specifies whether first-differences instead of pointwise partial derivatives should be computed for binary predictors. Ignored unless \code{derivative=TRUE}. 
 }
-  \item{vcov}{
-Logical that specifies whether variance-covariance matrix for the choice coefficients \var{c} and fitted values should be computed. Note that \code{derivative=TRUE} requires that \code{vcov=TRUE}. 
+\item{vcov}{
+Logical that specifies whether variance-covariance matrix for the choice coefficients \var{c} and fitted values should be computed. Note that \code{derivative=TRUE} requires that \code{vcov=TRUE} for the exact path. Under \code{approx = "nystrom"}, \code{vcov=TRUE} computes conditional approximate variances for the landmark coefficients and average derivatives without storing the full fitted-value covariance matrix.
 }
 
 \item{print.level}{
@@ -57,7 +69,130 @@ Positive scalar that determines the tolerance used in the optimization routine u
 }
 
 \item{eigtrunc}{
-Positive scalar that determines how much eignvalues should be trunacted for finding the upper bound of the search window in the algorithm outlined in \code{\link{lambdasearch}}. If \code{eigtrunc} is set to \var{10^-6} this means that we keep only eigenvalues that are \var{10^-6} as large as the first. Default is \code{eigtrunc=NULL} which means no truncation is used. 
+Positive scalar that determines how much eignvalues should be trunacted for finding the upper bound of the search window in the algorithm outlined in \code{\link{lambdasearch}}. If \code{eigtrunc} is set to \var{10^-6} this means that we keep only eigenvalues that are \var{10^-6} as large as the first. Default is \code{eigtrunc=NULL} which means no truncation is used.
+}
+
+\item{approx}{
+String selecting the approximation regime.
+
+\code{"auto"} (the default) uses the exact \var{N} by \var{N} kernel
+when the sample size does not exceed the would-be landmark count
+(\code{nystrom_m}, default \code{min(500, N)}), and switches to the
+Nystrom approximation otherwise. A one-line message is emitted when
+the switch happens, so the choice is visible at the call site.
+Conditions that are unsupported under Nystrom (non-Gaussian kernel,
+non-null \code{eigtrunc}, \code{derivative = TRUE} with
+\code{vcov = FALSE}) fall through to the exact path silently.
+
+\code{"none"} forces the exact path regardless of sample size; this
+is the historical KRLS behavior and gives identical fits to KRLS
+\eqn{\le}{<=} 1.5-2.
+
+\code{"nystrom"} forces the low-rank Nystrom approximation: an
+explicit \var{m}-dimensional feature map replaces the full kernel and
+the ridge problem is solved in \var{m}-space. Time becomes
+\var{O(N m^2 + m^3)} and memory \var{O(N m)}, so KRLS is feasible at
+\var{N} well beyond the exact path's ~5000-row ceiling. When
+\code{vcov = TRUE}, coefficient, prediction, and average-derivative
+standard errors are computed as conditional approximate Nystrom
+standard errors -- conditional on the selected landmarks, fixed
+\eqn{\lambda}{lambda}, and the low-rank feature approximation. The
+full \var{N} by \var{N} fitted-value covariance matrix is not stored.
+Only the Gaussian kernel is supported.
+}
+
+\item{nystrom_m}{
+Integer number of landmark points to use when \code{approx = "nystrom"}.
+Ignored otherwise. Default is \code{min(500, N)}, which keeps every
+row as a landmark for small samples and caps at 500 for larger ones.
+Larger \code{nystrom_m} approaches exact KRLS at a quadratic cost;
+smaller trades fit quality for runtime/memory. The internal
+approximation is \eqn{K \approx C\,W_{reg}^{-1}\,C^\top}{K = C
+W_reg^(-1) C'} where \eqn{C = K(X, Z)}{C = K(X, Z)},
+\eqn{W = K(Z, Z)}{W = K(Z, Z)}, and \eqn{W_{reg}}{W_reg} is \eqn{W}
+with eigenvalues floored at \code{nystrom_eps * max(eigenvalues of W)}.
+}
+
+\item{landmarks}{
+Optional landmark specification for \code{approx = "nystrom"}. One of:
+\code{NULL} (auto-select \code{nystrom_m} landmarks via
+\code{landmark_method}); an integer vector of row indices into \code{X};
+or an \var{m} by \var{D} numeric matrix of landmark coordinates in the
+original \code{X} units. If indices are supplied, the resolved standardized
+landmark matrix and the original index vector are both stored on the fit
+object; if a matrix is supplied, only the matrix is stored.
+}
+
+\item{landmark_method}{
+String selecting the auto-selection rule for landmarks when
+\code{landmarks = NULL}. \code{"random"} (the default) samples uniformly
+without replacement and is bit-reproducible under \code{set.seed()}.
+\code{"kmeans"} runs \code{stats::kmeans()} on the standardized
+predictors and uses cluster centers as landmarks -- typically more
+robust on imbalanced predictor distributions, but only approximately
+reproducible across R versions because the algorithm's initialization
+is implementation-dependent.
+}
+
+\item{nystrom_eps}{
+Positive scalar controlling the relative-ridge stabilization of the
+landmark kernel \var{W}. Eigenvalues of \var{W} below
+\code{nystrom_eps * max(eigenvalues of W)} are floored at that threshold
+before the feature map is built; this stabilizes the
+\eqn{W^{-1/2}}{W^(-1/2)} operation when landmarks are near-collinear in
+feature space. Documented as numerical stabilization, not a modeling
+parameter. Default is \code{sqrt(.Machine$double.eps)}.
+}
+
+\item{landmark_seed}{
+Optional integer seed used \emph{only} for landmark selection when
+\code{landmarks = NULL} and the chosen \code{landmark_method} is
+stochastic (random sampling or k-means). If supplied, the global
+\code{.Random.seed} is saved before landmark selection and restored
+on exit, so the caller's downstream RNG state is unaffected. This
+makes Nystrom fits bit-reproducible without forcing the user to
+remember a \code{set.seed()} call in their own code and without the
+silent-seed-reset failure mode that can plague simulations. Default
+is \code{NULL}, in which case landmark selection draws from
+whichever RNG state the caller has in effect.
+}
+
+\item{cat_columns}{
+Optional categorical-column declaration (new in 1.7-0). One of:
+\code{NULL} (the default; no one-hot expansion, but a single warning
+is emitted if columns of \code{X} look categorical -- factor /
+character / logical / numeric with few unique values -- and were not
+declared); a character vector of column names in \code{X}; or an
+integer vector of column indices.
+
+Declared columns are one-hot encoded with all levels (no reference
+cell) and multiplied by \code{sqrt(0.5)}, matching the convention
+used in \code{kbal::one_hot} and \code{gpss}. The factor of
+\code{sqrt(0.5)} compensates for the doubled squared-Euclidean
+distance from carrying both the "in level k" and "not in level k"
+indicators, so two observations differing in one category contribute
+1 (not 2) to \eqn{||x_i - x_j||^2}{||x_i - x_j||^2} -- equivalent to
+a Hamming distance. Continuous columns are still standardized to
+\code{sd = 1}.
+
+There is no autodetection. Pass \code{cat_columns = integer(0)} (or
+\code{character(0)}) to acknowledge that you have looked at \var{X}
+and nothing is categorical; this silences the heuristic warning.
+}
+
+\item{lambda_method}{
+String selecting the objective minimized to choose
+\eqn{\lambda}{lambda} when \code{lambda} is not supplied.
+\code{"loo"} (the default) uses the closed-form leave-one-out sum of
+squared errors -- the historical KRLS criterion. \code{"gcv"} uses
+generalized cross-validation,
+\eqn{RSS(\lambda) / (1 - \mathrm{tr}(S(\lambda))/n)^2}{RSS(lambda) /
+(1 - tr(S(lambda))/n)^2}, computed in closed form from the kernel
+eigendecomposition (exact path) or the cached SVD of \eqn{\Phi}{Phi}
+(Nystrom path). Both methods are evaluated at the same per-iteration
+cost; GCV is often preferred when one or two observations have
+disproportionate leverage. Ignored when \code{lambda} is supplied
+directly.
 }
 
 }
@@ -89,7 +224,7 @@ Accordingly, the \code{krls} function solves the following minimization problem
 
 which is convex in \eqn{c} and solved by \eqn{c=(K +\lambda I)^-1 y}{c=(K +lambda I)^-1 y} where \eqn{I} is the identity matrix. Note that this linear solution provides a flexible fitted response surface that typically reduces misspecification bias because it can learn a wide range of nonlinear and or nonadditive functions of the predictors. 
 
-If \code{vcov=TRUE} is specified, \code{krls} also computes the variance-covariance matrix for the choice coefficients \eqn{c} and fitted values \eqn{y=Kc} based on a variance estimator developed in Hainmueller and Hazlett (2014). Note that both matrices are \var{N} by \var{N} and therefore this results in increased memory and computing time.
+If \code{vcov=TRUE} is specified, exact KRLS also computes the variance-covariance matrix for the choice coefficients \eqn{c} and fitted values \eqn{y=Kc} based on a variance estimator developed in Hainmueller and Hazlett (2014). Note that both exact matrices are \var{N} by \var{N} and therefore this results in increased memory and computing time. Under \code{approx = "nystrom"}, \code{vcov=TRUE} computes conditional approximate variances in the \var{m}-landmark feature space and does not store the full fitted-value covariance matrix.
 
 By default, \code{krls} uses the Gaussian Kernel (\code{whichkernel = "gaussian"}) given by 
 
@@ -99,7 +234,7 @@ By default, \code{krls} uses the Gaussian Kernel (\code{whichkernel = "gaussian"
 where \eqn{||x_i - x_j||} is the Euclidean distance. The kernel bandwidth \eqn{\sigma^2}{sigma^2} is set to \eqn{D}, the number of dimensions, by default, but the user can also specify other values using the \code{sigma} argument to implement other approaches. 
 
 
-If \code{derivative=TRUE} is specified, \code{krls} also computes the pointwise partial derivatives of the fitted function wrt to each predictor using the estimators developed in Hainmueller and Hazlett (2014). These can be used to examine the marginal effects of each predictor and how the marginal effects vary across the covariate space. Average derivatives are also computed with variances. Note that the \code{derivative=TRUE} option results in increased computing time and is only supported for the Gaussian kernel, i.e. when \code{whichkernel = "gaussian"}. Also \code{derivative=TRUE} requires that \code{vcov=TRUE}. 
+If \code{derivative=TRUE} is specified, \code{krls} also computes the pointwise partial derivatives of the fitted function wrt to each predictor using the estimators developed in Hainmueller and Hazlett (2014). These can be used to examine the marginal effects of each predictor and how the marginal effects vary across the covariate space. Average derivatives are also computed with variances when \code{vcov=TRUE}. Note that the \code{derivative=TRUE} option results in increased computing time and is only supported for the Gaussian kernel, i.e. when \code{whichkernel = "gaussian"}. For the exact path, \code{derivative=TRUE} requires \code{vcov=TRUE}; under \code{approx = "nystrom"}, \code{derivative=TRUE, vcov=FALSE} returns derivative point estimates without standard errors.
 
 If \code{binary=TRUE} is also specified, the function will identify binary predictors and return first differences for these predictors instead of partial derivatives. First differences are computed going from the minimum to the maximum value of each binary predictor. Note that first differences are more appropriate to summarize the effects for binary predictors (see Hainmueller and Hazlett (2014) for details). 
 
@@ -117,8 +252,8 @@ A list object of class \code{krls} with the following elements:
   \item{sigma}{scalar with value of bandwidth, \eqn{\sigma^2}{sigma^2}, used for the Gaussian kernel.}   
   \item{lambda}{scalar with value of regularization parameter, \eqn{\lambda}{lambda}, used (user specified or based on leave-one-out cross-validation).}  
   \item{R2}{scalar with value of R-squared}
-  \item{vcov.c}{\var{N} by \var{N} variance covariance matrix for choice coefficients (\code{NULL} unless \code{vcov=TRUE} is specified).}
-  \item{vcov.fitted}{\var{N} by \var{N} variance covariance matrix for fitted values (\code{NULL} unless \code{vcov=TRUE} is specified).}  
+  \item{vcov.c}{Variance covariance matrix for choice coefficients (\var{N} by \var{N} for exact KRLS; \var{m} by \var{m} conditional approximate covariance under \code{approx = "nystrom"}; \code{NULL} unless \code{vcov=TRUE} is specified).}
+  \item{vcov.fitted}{\var{N} by \var{N} variance covariance matrix for fitted values under exact KRLS (\code{NULL} unless \code{vcov=TRUE} is specified, and always \code{NULL} under \code{approx = "nystrom"} to preserve the memory benefit).}
   \item{derivatives}{\var{N} by \var{D} matrix of pointwise partial derivatives based on the Gaussian kernel (\code{NULL} unless \code{derivative=TRUE} is specified. If \code{binary=TRUE} is specified, first differences are returned for binary predictors.}
   \item{avgderivatives}{1 by \var{D} matrix of average derivative based on the Gaussian kernel (\code{NULL} unless \code{derivative=TRUE} is specified. If \code{binary=TRUE} is specified, average first differences are returned for binary predictors.}
    \item{var.avgderivatives}{1 by \var{D} matrix of variances for average derivative based on gaussian kernel (\code{NULL} unless \code{derivative=TRUE} is specified. If \code{binary=TRUE} is specified, variances for average first differences are returned for binary predictors.}  
@@ -142,7 +277,7 @@ Kimeldorf, G.S. Wahba, G. 1971. Some results on Tchebycheffian spline functions.
 
 }
 \author{
-Jens Hainmueller (Stanford) and Chad Hazlett (MIT)
+Jens Hainmueller (Stanford) and Chad Hazlett (UCLA)
 }
 \note{
 The function requires the storage of a \var{N} by \var{N} kernel matrix and can therefore exceed the memory limits for very large datasets.

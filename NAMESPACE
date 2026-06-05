@@ -1,4 +1,7 @@
-export(gausskernel,
+export(b_maxvarK,
+       b_maxvarK_nystrom,
+       gausskernel,
+       get_landmarks,
        krls,
        looloss,
        predict.krls,
@@ -8,9 +11,20 @@ export(gausskernel,
 
 importFrom("grDevices", "devAskNewPage")
 importFrom("graphics", "arrows", "par", "plot")
-importFrom("stats", "as.formula", "dist", "predict", "pt", "quantile",
+importFrom("stats", "as.formula", "contrasts", "dist", "kmeans",
+           "model.frame", "model.matrix", "model.response", "na.omit",
+           "na.pass", "optimize", "predict", "pt", "qt", "quantile",
            "sd", "setNames", "var")
 
 S3method(plot, krls)
 S3method(predict, krls)
 S3method(summary, krls)
+
+# tidyverse / broom integration: methods registered against the
+# `generics` package generics so library(broom) picks them up.
+S3method(generics::tidy, krls)
+S3method(generics::glance, krls)
+S3method(generics::augment, krls)
+
+# ggplot2 autoplot
+S3method(ggplot2::autoplot, krls)

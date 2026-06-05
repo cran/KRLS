@@ -1,19 +1,23 @@
-fdskrls <- 
-  function(object,...){ 
+fdskrls <-
+  function(object,...){
     d <- ncol(object$X)
     n <- nrow(object$X)
     lengthunique    <- function(x){length(unique(x))}
-    
+
+    # SEs are only available when vcov was computed. If unavailable
+    # (for example vcov=FALSE), still return FD point estimates.
+    has_se <- !is.null(object$vcov.c)
+
     fdderivatives           =object$derivatives
     fdavgderivatives        =object$avgderivatives
-    fdvar.var.avgderivatives=object$var.avgderivatives    
-    
+    fdvar.var.avgderivatives=object$var.avgderivatives
+
     # vector with positions of binary variables
-    binaryindicator <-which(apply(object$X,2,lengthunique)==2)    
+    binaryindicator <-which(apply(object$X,2,lengthunique)==2)
       if(length(binaryindicator)==0){
-        # no binary vars in X; return derivs as is  
+        # no binary vars in X; return derivs as is
       } else {
-        # compute marginal differences from min to max 
+        # compute marginal differences from min to max
         est  <- se <- matrix(NA,nrow=1,ncol=length(binaryindicator))
         diffsstore <- matrix(NA,nrow=n,ncol=length(binaryindicator))
         for(i in 1:length(binaryindicator)){
@@ -26,23 +30,26 @@ fdskrls <-
           # contrast vector
           h         <- matrix(rep(c(1/n,-(1/n)),each=n),ncol=1)
           # fitted values
-          pout      <- predict(object,newdata=Xall,se=TRUE)
+          pout      <- predict(object,newdata=Xall,se.fit = has_se)
           # store FD estimates
-          est[1,i] <- t(h)%*%pout$fit        
-          # SE (multiply by sqrt2 to correct for using data twice )
-          se[1,i] <- as.vector(sqrt(t(h)%*%pout$vcov.fit%*%h))*sqrt(2)
+          est[1,i] <- t(h)%*%pout$fit
+          if (has_se) {
+            # SE (multiply by sqrt2 to correct for using data twice )
+            se[1,i] <- as.vector(sqrt(t(h)%*%pout$vcov.fit%*%h))*sqrt(2)
+          }
           # all
-          diffs <- pout$fit[1:n]-pout$fit[(n+1):(2*n)]          
-          diffsstore[,i] <- diffs 
-        }        
+          diffs <- pout$fit[1:n]-pout$fit[(n+1):(2*n)]
+          diffsstore[,i] <- diffs
+        }
         # sub in first differences
         object$derivatives[,binaryindicator] <- diffsstore
         object$avgderivatives[,binaryindicator] <- est
-        object$var.avgderivatives[,binaryindicator] <- se^2
+        if (has_se && !is.null(object$var.avgderivatives)) {
+          object$var.avgderivatives[,binaryindicator] <- se^2
+        }
         object$binaryindicator[,binaryindicator] <- TRUE
-      }  
-    
+      }
+
    return(invisible(object))
-  
+
 }
-  

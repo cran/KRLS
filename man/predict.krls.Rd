@@ -43,7 +43,7 @@ When data are missing in \code{newdata} during prediction, the value of each \eq
 }
 
 \author{
-Jens Hainmueller (Stanford) and Chad Hazlett (MIT)
+Jens Hainmueller (Stanford) and Chad Hazlett (UCLA)
 }
 
 \seealso{

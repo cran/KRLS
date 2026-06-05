@@ -14,7 +14,8 @@ lambdasearch(L=NULL,
            Eigenobject=NULL,
            tol=NULL,
            noisy=FALSE,
-           eigtrunc=NULL)
+           eigtrunc=NULL,
+           lambda_method = c("loo", "gcv"))
 }
 \arguments{
   \item{L}{Non-negative scalar that determines the lower bound of the search window. Default is \code{NULL} which means that the lower bound is found using an algorithm (see details).}
@@ -25,6 +26,14 @@ lambdasearch(L=NULL,
 \item{noisy}{If \code{TRUE}, the function will print details of the golden section search.}
 \item{eigtrunc}{
 Positive scalar value that determines truncation of eigenvalues for lamnda search window. See \code{\link{krls}} for details. Default is \code{NULL} which means no truncation.
+}
+\item{lambda_method}{
+String selecting the objective minimized to choose \eqn{\lambda}{lambda}.
+\code{"loo"} (the default) uses the closed-form leave-one-out sum of
+squared errors. \code{"gcv"} uses generalized cross-validation,
+\eqn{RSS(\lambda) / (1 - \mathrm{tr}(S(\lambda))/n)^2}{RSS(lambda) /
+(1 - tr(S(lambda))/n)^2}. Both are evaluated from the eigendecomposition
+of \code{K} at the same per-iteration cost.
 }
 }
 \details{
@@ -44,7 +53,7 @@ A scalar that contains the \eqn{\lambda}{lambda} that minimizes the sum of squar
 }
 
 \author{
-Jens Hainmueller (Stanford) and Chad Hazlett (MIT)
+Jens Hainmueller (Stanford) and Chad Hazlett (UCLA)
 }
 
 \seealso{

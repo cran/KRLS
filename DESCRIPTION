@@ -1,8 +1,8 @@
 Package: KRLS
 Type: Package
 Title: Kernel-Based Regularized Least Squares
-Version: 1.1-0
-Date: 2026-04-29
+Version: 1.7-0
+Date: 2026-06-04
 Authors@R: c(
     person("Jens", "Hainmueller", email = "jhain@stanford.edu", role = c("aut", "cre")),
     person("Chad", "Hazlett", role = "aut"))
@@ -15,15 +15,17 @@ Description: Implements Kernel-based Regularized Least Squares (KRLS), a
     see Hainmueller and Hazlett (2014, <doi:10.1093/pan/mpt019>).
 License: GPL (>= 2)
 Imports: grDevices, graphics, stats
-Suggests: lattice, testthat (>= 3.0.0)
+Suggests: lattice, testthat (>= 3.0.0), knitr, rmarkdown, ggplot2,
+        generics
 Config/testthat/edition: 3
+VignetteBuilder: knitr
 URL: https://web.stanford.edu/~jhain/, https://github.com/j-hai/KRLS
 BugReports: https://github.com/j-hai/KRLS/issues
 Encoding: UTF-8
 NeedsCompilation: no
-Packaged: 2026-04-29 16:21:16 UTC; jhainmueller
+Packaged: 2026-06-05 04:53:37 UTC; jhainmueller
 Author: Jens Hainmueller [aut, cre],
   Chad Hazlett [aut]
 Maintainer: Jens Hainmueller <jhain@stanford.edu>
 Repository: CRAN
-Date/Publication: 2026-04-30 05:10:43 UTC
+Date/Publication: 2026-06-05 07:30:14 UTC

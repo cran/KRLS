@@ -1,0 +1,151 @@
+---
+title: "Quickstart: kernel-regularized least squares with `KRLS`"
+author: "Jens Hainmueller and Chad Hazlett"
+date: "`r format(Sys.Date(), '%B %Y')`"
+output:
+  rmarkdown::html_vignette:
+    toc: true
+    toc_depth: 2
+vignette: >
+  %\VignetteIndexEntry{Quickstart: kernel-regularized least squares with KRLS}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 4.5,
+  dpi = 96
+)
+set.seed(1)
+```
+
+This vignette is the five-minute version: how to fit, inspect, and
+plot a kernel-regularized least squares (KRLS) regression. For the
+methodological background and pedagogy, see
+[the explainer](https://j-hai.github.io/projects/kernel-regularized-least-squares-explainer/)
+on the project site.
+
+## Why KRLS?
+
+KRLS estimates a flexible regression surface without assuming
+linearity, additivity, or pre-specified interactions, and it returns
+**pointwise marginal effects** — one partial derivative per
+observation — with closed-form analytical standard errors. That's the
+unique contribution: where OLS gives you one slope per predictor,
+KRLS gives you a *distribution* of slopes across the covariate space.
+
+```{r setup}
+library(KRLS)
+```
+
+## A simulated example
+
+Build a dataset where the marginal effect of `x1` *varies* across
+the covariate space. OLS will average it down to a single slope and
+miss the heterogeneity entirely.
+
+```{r data}
+set.seed(1)
+n  <- 200
+x1 <- runif(n, -2, 2)
+x2 <- runif(n, -2, 2)
+# True surface: nonlinear in x1, modulated by x2.
+y  <- sin(x1) + 0.5 * x2 * (x1 > 0) + rnorm(n, sd = 0.3)
+df <- data.frame(y = y, x1 = x1, x2 = x2)
+```
+
+## Fit
+
+The formula interface is new in `KRLS 1.2-0`:
+
+```{r fit}
+fit <- krls(y ~ x1 + x2, data = df, print.level = 0)
+```
+
+The matrix interface — `krls(X = cbind(x1, x2), y = y)` — works
+exactly the same way and is preserved unchanged from earlier
+releases.
+
+## Tidy output
+
+```{r tidy}
+library(generics)
+tidy(fit)
+glance(fit)
+```
+
+`tidy()` returns one row per predictor with the **average marginal
+effect** (`estimate`), its analytical standard error, a 95%
+confidence interval, and quartiles of the **pointwise** derivatives.
+
+That last block is the headline diagnostic. The AME of `x1` averages
+$\sin'(x_1) = \cos(x_1)$ across a symmetric interval and so is close
+to zero. But the *pointwise* marginal effects range from roughly −1
+to +1 — exactly the heterogeneity the simulation built in. The
+quartiles tell that story; OLS would not.
+
+`glance()` is a one-row summary of the fit: `nobs`, `n_predictors`,
+`r.squared`, leave-one-out MSE, the regularization parameter
+`lambda`, the kernel bandwidth `sigma`, and the effective degrees of
+freedom from the kernel ridge.
+
+## Visualize
+
+`autoplot()` shows the per-predictor distribution of pointwise
+marginal effects with the AME overlaid in blue:
+
+```{r autoplot, eval = requireNamespace("ggplot2", quietly = TRUE)}
+library(ggplot2)
+autoplot(fit)
+```
+
+The base-graphics `plot(fit)` is the same idea, with optional
+"profile" plots that hold one predictor fixed and vary another.
+
+## Augment for downstream analysis
+
+`augment()` joins fitted values, residuals, and pointwise
+marginal-effect columns back to the original data — useful when you
+want to feed the results into another model or visualization:
+
+```{r augment}
+aug <- augment(fit, data = df)
+head(aug, 3)
+```
+
+The columns `.dy_d_x1` and `.dy_d_x2` carry the pointwise
+derivatives, one row per observation, ready for `dplyr` /
+`ggplot2` / `data.table` workflows.
+
+## When KRLS is the right tool
+
+- You want a flexible regression surface but still need
+  **pointwise and average marginal effects** for substantive
+  interpretation.
+- Sample size is moderate ($n \lesssim 5{,}000$); KRLS solves an
+  $n \times n$ kernel system, so memory and time scale as $O(n^3)$.
+  For very large problems, see the explainer for alternatives.
+- You can standardize predictors so the Gaussian kernel's bandwidth
+  is sensible across them.
+
+## See also
+
+- `?krls`, `?summary.krls`, `?predict.krls`, `?plot.krls`.
+- `tidy()`, `glance()`, `augment()`, `autoplot()` are discoverable
+  via `library(broom)` / `library(ggplot2)`.
+- The KRLS Stata package mirrors this API; see the explainer page on
+  the project site for a side-by-side R + Stata walkthrough.
+
+## References
+
+- Hainmueller, J., and Hazlett, C. (2014). Kernel regularized least
+  squares: Reducing misspecification bias with a flexible and
+  interpretable machine learning approach. *Political Analysis*,
+  22(2), 143-168. <doi:10.1093/pan/mpt019>
+- Ferwerda, J., Hainmueller, J., and Hazlett, C. (2017). Kernel-Based
+  Regularized Least Squares in R (KRLS) and Stata. *Journal of
+  Statistical Software*, 79(3), 1-26.

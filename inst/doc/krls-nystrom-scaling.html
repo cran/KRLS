@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+<meta name="author" content="Jens Hainmueller and Chad Hazlett" />
+
+
+<title>Scaling KRLS to larger n: the Nystrom approximation</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Scaling KRLS to larger n: the Nystrom
+approximation</h1>
+<h4 class="author">Jens Hainmueller and Chad Hazlett</h4>
+<h4 class="date">June 2026</h4>
+
+
+<div id="TOC">
+<ul>
+<li><a href="#motivation" id="toc-motivation">Motivation</a></li>
+<li><a href="#a-scaling-comparison" id="toc-a-scaling-comparison">A
+scaling comparison</a></li>
+<li><a href="#scaling-beyond-what-exact-krls-can-do" id="toc-scaling-beyond-what-exact-krls-can-do">Scaling beyond what exact
+KRLS can do</a></li>
+<li><a href="#reusing-landmarks-across-fits" id="toc-reusing-landmarks-across-fits">Reusing landmarks across
+fits</a></li>
+<li><a href="#choosing-the-lambda-criterion" id="toc-choosing-the-lambda-criterion">Choosing the lambda
+criterion</a></li>
+<li><a href="#what-carries-over-from-the-exact-path" id="toc-what-carries-over-from-the-exact-path">What carries over from
+the exact path</a></li>
+<li><a href="#limitations" id="toc-limitations">Limitations</a></li>
+</ul>
+</div>
+
+<div id="motivation" class="section level2">
+<h2>Motivation</h2>
+<p>Exact KRLS solves a Tikhonov problem on the full <span class="math inline">\(n \times n\)</span> Gaussian kernel. Time is <span class="math inline">\(O(n^3)\)</span> and memory is <span class="math inline">\(O(n^2)\)</span>, so the practical ceiling on a
+laptop is around <span class="math inline">\(n \approx 5{,}000\)</span>.
+For larger samples the kernel allocation alone becomes prohibitive.</p>
+<p>The Nystrom approximation replaces the full kernel with a low-rank
+representation anchored at <span class="math inline">\(m\)</span>
+landmark points. The fitted model is <span class="math inline">\(\hat
+f(x) = K(x, Z)\, \alpha\)</span> where <span class="math inline">\(Z\)</span> are the landmarks and <span class="math inline">\(\alpha\)</span> is a length-<span class="math inline">\(m\)</span> coefficient vector solved in <span class="math inline">\(m\)</span>-dimensional space. Time becomes <span class="math inline">\(O(n m^2 + m^3)\)</span> and memory <span class="math inline">\(O(n m)\)</span>, so KRLS can now handle sample
+sizes well past the exact ceiling.</p>
+<p>KRLS exposes this as an explicit approximation:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">krls</span>(X, y, <span class="at">approx =</span> <span class="st">&quot;nystrom&quot;</span>, <span class="at">nystrom_m =</span> <span class="dv">100</span>)</span></code></pre></div>
+<p>Default landmark count is <code>min(500, n)</code>. Inference (when
+<code>vcov = TRUE</code>) is <em>conditional approximate</em> – standard
+errors condition on the selected landmarks, fixed <span class="math inline">\(\lambda\)</span>, and the low-rank feature map;
+they are not equivalent to exact KRLS inference.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">library</span>(KRLS)</span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="co">#&gt; ## KRLS Package for Kernel-based Regularized Least Squares.</span></span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a><span class="co">#&gt; ## See Hainmueller and Hazlett (2014) for details.</span></span></code></pre></div>
+</div>
+<div id="a-scaling-comparison" class="section level2">
+<h2>A scaling comparison</h2>
+<p>We simulate a smooth function in three predictors plus a binary
+indicator, and compare exact KRLS to Nystrom across modest <span class="math inline">\(n\)</span>.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>make_data <span class="ot">&lt;-</span> <span class="cf">function</span>(n) {</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>  X <span class="ot">&lt;-</span> <span class="fu">cbind</span>(<span class="fu">rnorm</span>(n), <span class="fu">rnorm</span>(n), <span class="fu">rnorm</span>(n), <span class="fu">rbinom</span>(n, <span class="dv">1</span>, <span class="fl">0.4</span>))</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>  <span class="fu">colnames</span>(X) <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;x1&quot;</span>, <span class="st">&quot;x2&quot;</span>, <span class="st">&quot;x3&quot;</span>, <span class="st">&quot;x4&quot;</span>)</span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>  f <span class="ot">&lt;-</span> <span class="fu">sin</span>(X[, <span class="dv">1</span>]) <span class="sc">+</span> <span class="fl">0.3</span> <span class="sc">*</span> X[, <span class="dv">2</span>] <span class="sc">+</span> <span class="fl">0.05</span> <span class="sc">*</span> X[, <span class="dv">3</span>]<span class="sc">^</span><span class="dv">2</span> <span class="sc">+</span> <span class="fl">0.5</span> <span class="sc">*</span> X[, <span class="dv">4</span>]</span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>  <span class="fu">list</span>(<span class="at">X =</span> X, <span class="at">y =</span> f <span class="sc">+</span> <span class="fu">rnorm</span>(n, <span class="at">sd =</span> <span class="fl">0.3</span>), <span class="at">truth =</span> f)</span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>}</span></code></pre></div>
+<p>For each <span class="math inline">\(n\)</span> we fit both paths,
+record wall-clock time, in-sample <span class="math inline">\(R^2\)</span>, and prediction RMSE on a held-out
+test set drawn from the same distribution. Predictions are evaluated
+against the true mean function (no noise on the test target) to focus on
+approximation error.</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>sizes <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="dv">500</span>, <span class="dv">1000</span>)</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>res <span class="ot">&lt;-</span> <span class="fu">vector</span>(<span class="st">&quot;list&quot;</span>, <span class="fu">length</span>(sizes))</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a></span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="fu">seq_along</span>(sizes)) {</span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>  n <span class="ot">&lt;-</span> sizes[i]</span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>  tr <span class="ot">&lt;-</span> <span class="fu">make_data</span>(n)</span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>  te <span class="ot">&lt;-</span> <span class="fu">make_data</span>(<span class="dv">200</span>)</span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>  <span class="co"># Use the package default landmark count, min(500, n).</span></span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a>  m  <span class="ot">&lt;-</span> <span class="fu">min</span>(<span class="dv">500</span><span class="dt">L</span>, n)</span>
+<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a></span>
+<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a>  t_e <span class="ot">&lt;-</span> <span class="fu">system.time</span>({</span>
+<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a>    fit_e <span class="ot">&lt;-</span> <span class="fu">krls</span>(tr<span class="sc">$</span>X, tr<span class="sc">$</span>y, <span class="at">approx =</span> <span class="st">&quot;none&quot;</span>,</span>
+<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a>                  <span class="at">derivative =</span> <span class="cn">FALSE</span>, <span class="at">vcov =</span> <span class="cn">FALSE</span>,</span>
+<span id="cb4-14"><a href="#cb4-14" tabindex="-1"></a>                  <span class="at">print.level =</span> <span class="dv">0</span>)</span>
+<span id="cb4-15"><a href="#cb4-15" tabindex="-1"></a>  })[<span class="st">&quot;elapsed&quot;</span>]</span>
+<span id="cb4-16"><a href="#cb4-16" tabindex="-1"></a>  t_n <span class="ot">&lt;-</span> <span class="fu">system.time</span>({</span>
+<span id="cb4-17"><a href="#cb4-17" tabindex="-1"></a>    fit_n <span class="ot">&lt;-</span> <span class="fu">krls</span>(tr<span class="sc">$</span>X, tr<span class="sc">$</span>y, <span class="at">approx =</span> <span class="st">&quot;nystrom&quot;</span>,</span>
+<span id="cb4-18"><a href="#cb4-18" tabindex="-1"></a>                  <span class="at">derivative =</span> <span class="cn">FALSE</span>, <span class="at">print.level =</span> <span class="dv">0</span>)</span>
+<span id="cb4-19"><a href="#cb4-19" tabindex="-1"></a>  })[<span class="st">&quot;elapsed&quot;</span>]</span>
+<span id="cb4-20"><a href="#cb4-20" tabindex="-1"></a></span>
+<span id="cb4-21"><a href="#cb4-21" tabindex="-1"></a>  pred_e <span class="ot">&lt;-</span> <span class="fu">predict</span>(fit_e, <span class="at">newdata =</span> te<span class="sc">$</span>X)<span class="sc">$</span>fit</span>
+<span id="cb4-22"><a href="#cb4-22" tabindex="-1"></a>  pred_n <span class="ot">&lt;-</span> <span class="fu">predict</span>(fit_n, <span class="at">newdata =</span> te<span class="sc">$</span>X)<span class="sc">$</span>fit</span>
+<span id="cb4-23"><a href="#cb4-23" tabindex="-1"></a></span>
+<span id="cb4-24"><a href="#cb4-24" tabindex="-1"></a>  res[[i]] <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb4-25"><a href="#cb4-25" tabindex="-1"></a>    <span class="at">n          =</span> n,</span>
+<span id="cb4-26"><a href="#cb4-26" tabindex="-1"></a>    <span class="at">m          =</span> m,</span>
+<span id="cb4-27"><a href="#cb4-27" tabindex="-1"></a>    <span class="at">time_exact =</span> <span class="fu">round</span>(<span class="fu">as.numeric</span>(t_e), <span class="dv">2</span>),</span>
+<span id="cb4-28"><a href="#cb4-28" tabindex="-1"></a>    <span class="at">time_nys   =</span> <span class="fu">round</span>(<span class="fu">as.numeric</span>(t_n), <span class="dv">3</span>),</span>
+<span id="cb4-29"><a href="#cb4-29" tabindex="-1"></a>    <span class="at">speedup    =</span> <span class="fu">round</span>(<span class="fu">as.numeric</span>(t_e) <span class="sc">/</span> <span class="fu">as.numeric</span>(t_n), <span class="dv">1</span>),</span>
+<span id="cb4-30"><a href="#cb4-30" tabindex="-1"></a>    <span class="at">rmse_exact =</span> <span class="fu">round</span>(<span class="fu">sqrt</span>(<span class="fu">mean</span>((pred_e <span class="sc">-</span> te<span class="sc">$</span>truth)<span class="sc">^</span><span class="dv">2</span>)), <span class="dv">4</span>),</span>
+<span id="cb4-31"><a href="#cb4-31" tabindex="-1"></a>    <span class="at">rmse_nys   =</span> <span class="fu">round</span>(<span class="fu">sqrt</span>(<span class="fu">mean</span>((pred_n <span class="sc">-</span> te<span class="sc">$</span>truth)<span class="sc">^</span><span class="dv">2</span>)), <span class="dv">4</span>)</span>
+<span id="cb4-32"><a href="#cb4-32" tabindex="-1"></a>  )</span>
+<span id="cb4-33"><a href="#cb4-33" tabindex="-1"></a>}</span>
+<span id="cb4-34"><a href="#cb4-34" tabindex="-1"></a><span class="co">#&gt; Warning: krls: the following column(s) look categorical but were not listed in cat_columns:</span></span>
+<span id="cb4-35"><a href="#cb4-35" tabindex="-1"></a><span class="co">#&gt;   x4 (2 unique values)</span></span>
+<span id="cb4-36"><a href="#cb4-36" tabindex="-1"></a><span class="co">#&gt; KRLS does NOT autodetect categoricals. Pass these in cat_columns to get the sqrt(0.5)-scaled one-hot encoding (matching kbal / GPSS), or pass cat_columns = character(0) / integer(0) to silence this warning.</span></span>
+<span id="cb4-37"><a href="#cb4-37" tabindex="-1"></a><span class="co">#&gt; Warning: krls: the following column(s) look categorical but were not listed in cat_columns:</span></span>
+<span id="cb4-38"><a href="#cb4-38" tabindex="-1"></a><span class="co">#&gt;   x4 (2 unique values)</span></span>
+<span id="cb4-39"><a href="#cb4-39" tabindex="-1"></a><span class="co">#&gt; KRLS does NOT autodetect categoricals. Pass these in cat_columns to get the sqrt(0.5)-scaled one-hot encoding (matching kbal / GPSS), or pass cat_columns = character(0) / integer(0) to silence this warning.</span></span>
+<span id="cb4-40"><a href="#cb4-40" tabindex="-1"></a><span class="co">#&gt; Warning: krls: the following column(s) look categorical but were not listed in cat_columns:</span></span>
+<span id="cb4-41"><a href="#cb4-41" tabindex="-1"></a><span class="co">#&gt;   x4 (2 unique values)</span></span>
+<span id="cb4-42"><a href="#cb4-42" tabindex="-1"></a><span class="co">#&gt; KRLS does NOT autodetect categoricals. Pass these in cat_columns to get the sqrt(0.5)-scaled one-hot encoding (matching kbal / GPSS), or pass cat_columns = character(0) / integer(0) to silence this warning.</span></span>
+<span id="cb4-43"><a href="#cb4-43" tabindex="-1"></a><span class="co">#&gt; Warning: krls: the following column(s) look categorical but were not listed in cat_columns:</span></span>
+<span id="cb4-44"><a href="#cb4-44" tabindex="-1"></a><span class="co">#&gt;   x4 (2 unique values)</span></span>
+<span id="cb4-45"><a href="#cb4-45" tabindex="-1"></a><span class="co">#&gt; KRLS does NOT autodetect categoricals. Pass these in cat_columns to get the sqrt(0.5)-scaled one-hot encoding (matching kbal / GPSS), or pass cat_columns = character(0) / integer(0) to silence this warning.</span></span>
+<span id="cb4-46"><a href="#cb4-46" tabindex="-1"></a><span class="fu">do.call</span>(rbind, res)</span>
+<span id="cb4-47"><a href="#cb4-47" tabindex="-1"></a><span class="co">#&gt;      n   m time_exact time_nys speedup rmse_exact rmse_nys</span></span>
+<span id="cb4-48"><a href="#cb4-48" tabindex="-1"></a><span class="co">#&gt; 1  500 500       0.84    0.568     1.5     0.1119   0.1119</span></span>
+<span id="cb4-49"><a href="#cb4-49" tabindex="-1"></a><span class="co">#&gt; 2 1000 500       6.26    1.187     5.3     0.0885   0.0885</span></span></code></pre></div>
+<p>The Nystrom path stays in milliseconds while exact KRLS grows
+cubically. Prediction RMSE on held-out data is comparable – Nystrom
+trades a small amount of approximation error for a large amount of
+runtime.</p>
+</div>
+<div id="scaling-beyond-what-exact-krls-can-do" class="section level2">
+<h2>Scaling beyond what exact KRLS can do</h2>
+<p>Past <span class="math inline">\(n \approx 2{,}000\)</span> the exact
+path becomes uncomfortable on a typical laptop. Nystrom keeps going:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>n  <span class="ot">&lt;-</span> <span class="dv">2000</span></span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>tr <span class="ot">&lt;-</span> <span class="fu">make_data</span>(n)</span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>te <span class="ot">&lt;-</span> <span class="fu">make_data</span>(<span class="dv">200</span>)</span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a><span class="co"># Default is min(500, n) -- here 500 landmarks at n = 2000.</span></span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>m  <span class="ot">&lt;-</span> <span class="fu">min</span>(<span class="dv">500</span><span class="dt">L</span>, n)</span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a></span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>t_n <span class="ot">&lt;-</span> <span class="fu">system.time</span>({</span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a>  fit_big <span class="ot">&lt;-</span> <span class="fu">krls</span>(tr<span class="sc">$</span>X, tr<span class="sc">$</span>y, <span class="at">approx =</span> <span class="st">&quot;nystrom&quot;</span>,</span>
+<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a>                  <span class="at">derivative =</span> <span class="cn">FALSE</span>, <span class="at">print.level =</span> <span class="dv">0</span>)</span>
+<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a>})[<span class="st">&quot;elapsed&quot;</span>]</span>
+<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a><span class="co">#&gt; Warning: krls: the following column(s) look categorical but were not listed in cat_columns:</span></span>
+<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a><span class="co">#&gt;   x4 (2 unique values)</span></span>
+<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a><span class="co">#&gt; KRLS does NOT autodetect categoricals. Pass these in cat_columns to get the sqrt(0.5)-scaled one-hot encoding (matching kbal / GPSS), or pass cat_columns = character(0) / integer(0) to silence this warning.</span></span>
+<span id="cb5-14"><a href="#cb5-14" tabindex="-1"></a></span>
+<span id="cb5-15"><a href="#cb5-15" tabindex="-1"></a>pred_big <span class="ot">&lt;-</span> <span class="fu">predict</span>(fit_big, <span class="at">newdata =</span> te<span class="sc">$</span>X)<span class="sc">$</span>fit</span>
+<span id="cb5-16"><a href="#cb5-16" tabindex="-1"></a><span class="fu">sprintf</span>(<span class="st">&quot;n = %d, m = %d, time = %.3fs, R2 = %.3f, RMSE = %.3f&quot;</span>,</span>
+<span id="cb5-17"><a href="#cb5-17" tabindex="-1"></a>        n, m, t_n, fit_big<span class="sc">$</span>R2,</span>
+<span id="cb5-18"><a href="#cb5-18" tabindex="-1"></a>        <span class="fu">sqrt</span>(<span class="fu">mean</span>((pred_big <span class="sc">-</span> te<span class="sc">$</span>truth)<span class="sc">^</span><span class="dv">2</span>)))</span>
+<span id="cb5-19"><a href="#cb5-19" tabindex="-1"></a><span class="co">#&gt; [1] &quot;n = 2000, m = 500, time = 2.436s, R2 = 0.862, RMSE = 0.075&quot;</span></span></code></pre></div>
+<p>The fit still recovers the truth at held-out RMSE comparable to the
+exact path on the smaller datasets, in a fraction of a second.</p>
+</div>
+<div id="reusing-landmarks-across-fits" class="section level2">
+<h2>Reusing landmarks across fits</h2>
+<p>When running sensitivity checks – refitting on the same predictors
+with several outcome variants, or perturbing <span class="math inline">\(y\)</span> – it is convenient to fix the landmark
+set so the approximation geometry is held constant. The fitted object
+stores landmarks in standardized <span class="math inline">\(X\)</span>-space; to pass them back through
+<code>krls()</code> use <code>get_landmarks()</code>, which
+un-standardizes to the original units the function expects:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>tr <span class="ot">&lt;-</span> <span class="fu">make_data</span>(<span class="dv">400</span>)</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>fit <span class="ot">&lt;-</span> <span class="fu">krls</span>(tr<span class="sc">$</span>X, tr<span class="sc">$</span>y, <span class="at">approx =</span> <span class="st">&quot;nystrom&quot;</span>, <span class="at">nystrom_m =</span> <span class="dv">30</span>,</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>            <span class="at">derivative =</span> <span class="cn">FALSE</span>, <span class="at">print.level =</span> <span class="dv">0</span>)</span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a><span class="co">#&gt; Warning: krls: the following column(s) look categorical but were not listed in cat_columns:</span></span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a><span class="co">#&gt;   x4 (2 unique values)</span></span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a><span class="co">#&gt; KRLS does NOT autodetect categoricals. Pass these in cat_columns to get the sqrt(0.5)-scaled one-hot encoding (matching kbal / GPSS), or pass cat_columns = character(0) / integer(0) to silence this warning.</span></span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a></span>
+<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a>Z <span class="ot">&lt;-</span> <span class="fu">get_landmarks</span>(fit)              <span class="co"># original X-scale matrix</span></span>
+<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a>y_perturbed <span class="ot">&lt;-</span> tr<span class="sc">$</span>y <span class="sc">+</span> <span class="fu">rnorm</span>(<span class="dv">400</span>, <span class="at">sd =</span> <span class="fl">0.05</span>)</span>
+<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a></span>
+<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a>fit2 <span class="ot">&lt;-</span> <span class="fu">krls</span>(tr<span class="sc">$</span>X, y_perturbed, <span class="at">approx =</span> <span class="st">&quot;nystrom&quot;</span>,</span>
+<span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a>             <span class="at">landmarks =</span> Z, <span class="at">derivative =</span> <span class="cn">FALSE</span>, <span class="at">print.level =</span> <span class="dv">0</span>)</span>
+<span id="cb6-13"><a href="#cb6-13" tabindex="-1"></a><span class="co">#&gt; Warning: krls: the following column(s) look categorical but were not listed in cat_columns:</span></span>
+<span id="cb6-14"><a href="#cb6-14" tabindex="-1"></a><span class="co">#&gt;   x4 (2 unique values)</span></span>
+<span id="cb6-15"><a href="#cb6-15" tabindex="-1"></a><span class="co">#&gt; KRLS does NOT autodetect categoricals. Pass these in cat_columns to get the sqrt(0.5)-scaled one-hot encoding (matching kbal / GPSS), or pass cat_columns = character(0) / integer(0) to silence this warning.</span></span>
+<span id="cb6-16"><a href="#cb6-16" tabindex="-1"></a></span>
+<span id="cb6-17"><a href="#cb6-17" tabindex="-1"></a><span class="co"># Same landmarks under the hood</span></span>
+<span id="cb6-18"><a href="#cb6-18" tabindex="-1"></a><span class="fu">identical</span>(<span class="fu">unname</span>(fit<span class="sc">$</span>landmarks), <span class="fu">unname</span>(fit2<span class="sc">$</span>landmarks))</span>
+<span id="cb6-19"><a href="#cb6-19" tabindex="-1"></a><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
+<p>The landmark coordinates are bit-identical, so any difference between
+the two fits is attributable to the change in <span class="math inline">\(y\)</span> alone – not to re-selecting anchor
+points.</p>
+</div>
+<div id="choosing-the-lambda-criterion" class="section level2">
+<h2>Choosing the lambda criterion</h2>
+<p>KRLS picks the regularization parameter by minimizing a closed-form
+objective. Two are available:</p>
+<ul>
+<li><code>lambda_method = &quot;loo&quot;</code> (the default) – leave-one-out
+squared error.</li>
+<li><code>lambda_method = &quot;gcv&quot;</code> – generalized cross-validation,
+<span class="math inline">\(RSS(\lambda) / (1 -
+\mathrm{tr}(S(\lambda))/n)^2\)</span>.</li>
+</ul>
+<p>For the Nystrom path both are evaluated in <span class="math inline">\(O(nm)\)</span> per candidate <span class="math inline">\(\lambda\)</span> from the cached SVD, so the
+choice is essentially free.</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>tr <span class="ot">&lt;-</span> <span class="fu">make_data</span>(<span class="dv">500</span>)</span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>fit_loo <span class="ot">&lt;-</span> <span class="fu">krls</span>(tr<span class="sc">$</span>X, tr<span class="sc">$</span>y, <span class="at">approx =</span> <span class="st">&quot;nystrom&quot;</span>, <span class="at">nystrom_m =</span> <span class="dv">25</span>,</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>                <span class="at">derivative =</span> <span class="cn">FALSE</span>, <span class="at">lambda_method =</span> <span class="st">&quot;loo&quot;</span>,</span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>                <span class="at">print.level =</span> <span class="dv">0</span>)</span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a><span class="co">#&gt; Warning: krls: the following column(s) look categorical but were not listed in cat_columns:</span></span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a><span class="co">#&gt;   x4 (2 unique values)</span></span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a><span class="co">#&gt; KRLS does NOT autodetect categoricals. Pass these in cat_columns to get the sqrt(0.5)-scaled one-hot encoding (matching kbal / GPSS), or pass cat_columns = character(0) / integer(0) to silence this warning.</span></span>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a>fit_gcv <span class="ot">&lt;-</span> <span class="fu">krls</span>(tr<span class="sc">$</span>X, tr<span class="sc">$</span>y, <span class="at">approx =</span> <span class="st">&quot;nystrom&quot;</span>, <span class="at">nystrom_m =</span> <span class="dv">25</span>,</span>
+<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a>                <span class="at">derivative =</span> <span class="cn">FALSE</span>, <span class="at">lambda_method =</span> <span class="st">&quot;gcv&quot;</span>,</span>
+<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a>                <span class="at">print.level =</span> <span class="dv">0</span>)</span>
+<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a><span class="co">#&gt; Warning: krls: the following column(s) look categorical but were not listed in cat_columns:</span></span>
+<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a><span class="co">#&gt;   x4 (2 unique values)</span></span>
+<span id="cb7-13"><a href="#cb7-13" tabindex="-1"></a><span class="co">#&gt; KRLS does NOT autodetect categoricals. Pass these in cat_columns to get the sqrt(0.5)-scaled one-hot encoding (matching kbal / GPSS), or pass cat_columns = character(0) / integer(0) to silence this warning.</span></span>
+<span id="cb7-14"><a href="#cb7-14" tabindex="-1"></a><span class="fu">data.frame</span>(</span>
+<span id="cb7-15"><a href="#cb7-15" tabindex="-1"></a>  <span class="at">method =</span> <span class="fu">c</span>(<span class="st">&quot;loo&quot;</span>, <span class="st">&quot;gcv&quot;</span>),</span>
+<span id="cb7-16"><a href="#cb7-16" tabindex="-1"></a>  <span class="at">lambda =</span> <span class="fu">c</span>(fit_loo<span class="sc">$</span>lambda, fit_gcv<span class="sc">$</span>lambda),</span>
+<span id="cb7-17"><a href="#cb7-17" tabindex="-1"></a>  <span class="at">R2     =</span> <span class="fu">c</span>(fit_loo<span class="sc">$</span>R2, fit_gcv<span class="sc">$</span>R2)</span>
+<span id="cb7-18"><a href="#cb7-18" tabindex="-1"></a>)</span>
+<span id="cb7-19"><a href="#cb7-19" tabindex="-1"></a><span class="co">#&gt;   method    lambda        R2</span></span>
+<span id="cb7-20"><a href="#cb7-20" tabindex="-1"></a><span class="co">#&gt; 1    loo 0.1983744 0.8341407</span></span>
+<span id="cb7-21"><a href="#cb7-21" tabindex="-1"></a><span class="co">#&gt; 2    gcv 0.3202462 0.8134584</span></span></code></pre></div>
+<p>LOO and GCV typically pick lambdas within a small multiplicative
+factor of each other. GCV is sometimes preferred when one or two
+observations have disproportionate leverage; LOO has more historical use
+in KRLS applications.</p>
+</div>
+<div id="what-carries-over-from-the-exact-path" class="section level2">
+<h2>What carries over from the exact path</h2>
+<p>A Nystrom fit is still a <code>krls</code> object, so the standard
+accessors work:</p>
+<ul>
+<li><code>predict(fit, newdata = ...)</code> – predictions; pass
+<code>se.fit = TRUE</code> for conditional approximate standard errors
+when the fit was built with <code>vcov = TRUE</code>.</li>
+<li><code>summary(fit)</code> – now prints an <em>Approximation</em>
+block reporting <code>m</code>, the landmark method, inference type, the
+landmark-kernel condition number, and the count of eigenvalues at the
+relative-ridge floor.</li>
+<li><code>tidy(fit)</code>, <code>glance(fit)</code>,
+<code>augment(fit)</code> – broom methods are Nystrom-aware.
+<code>glance()</code> reports <code>approx</code>,
+<code>nystrom_m</code>, <code>inference</code>, and the effective
+degrees of freedom.</li>
+</ul>
+</div>
+<div id="limitations" class="section level2">
+<h2>Limitations</h2>
+<ul>
+<li>Standard errors are <em>conditional</em> on the selected landmarks,
+fixed <span class="math inline">\(\lambda\)</span>, and the low-rank
+feature approximation. They are not equivalent to exact KRLS standard
+errors and should not be used in contexts that assume exact
+inference.</li>
+<li>Only the Gaussian kernel is supported under
+<code>approx = &quot;nystrom&quot;</code>.</li>
+<li><code>kmeans</code> landmark selection is approximately reproducible
+under <code>set.seed()</code> but not bit-stable across R versions; for
+strict reproducibility use the default random sampling or supply
+landmarks explicitly.</li>
+</ul>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

@@ -30,7 +30,7 @@ Positive scalar value that determines truncation of eigenvalues for lamnda searc
 Scalar value for LOO error.
 }
 \author{
-Jens Hainmueller (Stanford) and Chad Hazlett (MIT)
+Jens Hainmueller (Stanford) and Chad Hazlett (UCLA)
 }
 \seealso{
 \code{\link{krls}}

@@ -1,0 +1,227 @@
+---
+title: "Scaling KRLS to larger n: the Nystrom approximation"
+author: "Jens Hainmueller and Chad Hazlett"
+date: "`r format(Sys.Date(), '%B %Y')`"
+output:
+  rmarkdown::html_vignette:
+    toc: true
+    toc_depth: 2
+vignette: >
+  %\VignetteIndexEntry{Scaling KRLS to larger n: the Nystrom approximation}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment  = "#>",
+  fig.width  = 7,
+  fig.height = 4.5,
+  dpi = 96
+)
+set.seed(2026)
+```
+
+## Motivation
+
+Exact KRLS solves a Tikhonov problem on the full $n \times n$ Gaussian
+kernel. Time is $O(n^3)$ and memory is $O(n^2)$, so the practical
+ceiling on a laptop is around $n \approx 5{,}000$. For larger samples
+the kernel allocation alone becomes prohibitive.
+
+The Nystrom approximation replaces the full kernel with a low-rank
+representation anchored at $m$ landmark points. The fitted model is
+$\hat f(x) = K(x, Z)\, \alpha$ where $Z$ are the landmarks and $\alpha$
+is a length-$m$ coefficient vector solved in $m$-dimensional space.
+Time becomes $O(n m^2 + m^3)$ and memory $O(n m)$, so KRLS can now
+handle sample sizes well past the exact ceiling.
+
+KRLS exposes this as an explicit approximation:
+
+```r
+krls(X, y, approx = "nystrom", nystrom_m = 100)
+```
+
+Default landmark count is `min(500, n)`. Inference (when
+`vcov = TRUE`) is *conditional approximate* -- standard errors
+condition on the selected landmarks, fixed $\lambda$, and the low-rank
+feature map; they are not equivalent to exact KRLS inference.
+
+```{r setup}
+library(KRLS)
+```
+
+## A scaling comparison
+
+We simulate a smooth function in three predictors plus a binary
+indicator, and compare exact KRLS to Nystrom across modest $n$.
+
+```{r dgp}
+make_data <- function(n) {
+  X <- cbind(rnorm(n), rnorm(n), rnorm(n), rbinom(n, 1, 0.4))
+  colnames(X) <- c("x1", "x2", "x3", "x4")
+  f <- sin(X[, 1]) + 0.3 * X[, 2] + 0.05 * X[, 3]^2 + 0.5 * X[, 4]
+  list(X = X, y = f + rnorm(n, sd = 0.3), truth = f)
+}
+```
+
+For each $n$ we fit both paths, record wall-clock time, in-sample
+$R^2$, and prediction RMSE on a held-out test set drawn from the same
+distribution. Predictions are evaluated against the true mean function
+(no noise on the test target) to focus on approximation error.
+
+```{r bench, cache = FALSE}
+sizes <- c(500, 1000)
+res <- vector("list", length(sizes))
+
+for (i in seq_along(sizes)) {
+  n <- sizes[i]
+  tr <- make_data(n)
+  te <- make_data(200)
+  # Use the package default landmark count, min(500, n).
+  m  <- min(500L, n)
+
+  t_e <- system.time({
+    fit_e <- krls(tr$X, tr$y, approx = "none",
+                  derivative = FALSE, vcov = FALSE,
+                  print.level = 0)
+  })["elapsed"]
+  t_n <- system.time({
+    fit_n <- krls(tr$X, tr$y, approx = "nystrom",
+                  derivative = FALSE, print.level = 0)
+  })["elapsed"]
+
+  pred_e <- predict(fit_e, newdata = te$X)$fit
+  pred_n <- predict(fit_n, newdata = te$X)$fit
+
+  res[[i]] <- data.frame(
+    n          = n,
+    m          = m,
+    time_exact = round(as.numeric(t_e), 2),
+    time_nys   = round(as.numeric(t_n), 3),
+    speedup    = round(as.numeric(t_e) / as.numeric(t_n), 1),
+    rmse_exact = round(sqrt(mean((pred_e - te$truth)^2)), 4),
+    rmse_nys   = round(sqrt(mean((pred_n - te$truth)^2)), 4)
+  )
+}
+do.call(rbind, res)
+```
+
+The Nystrom path stays in milliseconds while exact KRLS grows
+cubically. Prediction RMSE on held-out data is comparable -- Nystrom
+trades a small amount of approximation error for a large amount of
+runtime.
+
+## Scaling beyond what exact KRLS can do
+
+Past $n \approx 2{,}000$ the exact path becomes uncomfortable on a
+typical laptop. Nystrom keeps going:
+
+```{r big}
+n  <- 2000
+tr <- make_data(n)
+te <- make_data(200)
+# Default is min(500, n) -- here 500 landmarks at n = 2000.
+m  <- min(500L, n)
+
+t_n <- system.time({
+  fit_big <- krls(tr$X, tr$y, approx = "nystrom",
+                  derivative = FALSE, print.level = 0)
+})["elapsed"]
+
+pred_big <- predict(fit_big, newdata = te$X)$fit
+sprintf("n = %d, m = %d, time = %.3fs, R2 = %.3f, RMSE = %.3f",
+        n, m, t_n, fit_big$R2,
+        sqrt(mean((pred_big - te$truth)^2)))
+```
+
+The fit still recovers the truth at held-out RMSE comparable to the
+exact path on the smaller datasets, in a fraction of a second.
+
+## Reusing landmarks across fits
+
+When running sensitivity checks -- refitting on the same predictors
+with several outcome variants, or perturbing $y$ -- it is convenient to
+fix the landmark set so the approximation geometry is held constant.
+The fitted object stores landmarks in standardized $X$-space; to pass
+them back through `krls()` use `get_landmarks()`, which un-standardizes
+to the original units the function expects:
+
+```{r reuse}
+tr <- make_data(400)
+fit <- krls(tr$X, tr$y, approx = "nystrom", nystrom_m = 30,
+            derivative = FALSE, print.level = 0)
+
+Z <- get_landmarks(fit)              # original X-scale matrix
+y_perturbed <- tr$y + rnorm(400, sd = 0.05)
+
+fit2 <- krls(tr$X, y_perturbed, approx = "nystrom",
+             landmarks = Z, derivative = FALSE, print.level = 0)
+
+# Same landmarks under the hood
+identical(unname(fit$landmarks), unname(fit2$landmarks))
+```
+
+The landmark coordinates are bit-identical, so any difference between
+the two fits is attributable to the change in $y$ alone -- not to
+re-selecting anchor points.
+
+## Choosing the lambda criterion
+
+KRLS picks the regularization parameter by minimizing a closed-form
+objective. Two are available:
+
+* `lambda_method = "loo"` (the default) -- leave-one-out squared error.
+* `lambda_method = "gcv"` -- generalized cross-validation,
+  $RSS(\lambda) / (1 - \mathrm{tr}(S(\lambda))/n)^2$.
+
+For the Nystrom path both are evaluated in $O(nm)$ per candidate
+$\lambda$ from the cached SVD, so the choice is essentially free.
+
+```{r gcv}
+tr <- make_data(500)
+fit_loo <- krls(tr$X, tr$y, approx = "nystrom", nystrom_m = 25,
+                derivative = FALSE, lambda_method = "loo",
+                print.level = 0)
+fit_gcv <- krls(tr$X, tr$y, approx = "nystrom", nystrom_m = 25,
+                derivative = FALSE, lambda_method = "gcv",
+                print.level = 0)
+data.frame(
+  method = c("loo", "gcv"),
+  lambda = c(fit_loo$lambda, fit_gcv$lambda),
+  R2     = c(fit_loo$R2, fit_gcv$R2)
+)
+```
+
+LOO and GCV typically pick lambdas within a small multiplicative
+factor of each other. GCV is sometimes preferred when one or two
+observations have disproportionate leverage; LOO has more historical
+use in KRLS applications.
+
+## What carries over from the exact path
+
+A Nystrom fit is still a `krls` object, so the standard accessors
+work:
+
+* `predict(fit, newdata = ...)` -- predictions; pass `se.fit = TRUE`
+  for conditional approximate standard errors when the fit was built
+  with `vcov = TRUE`.
+* `summary(fit)` -- now prints an *Approximation* block reporting `m`,
+  the landmark method, inference type, the landmark-kernel condition
+  number, and the count of eigenvalues at the relative-ridge floor.
+* `tidy(fit)`, `glance(fit)`, `augment(fit)` -- broom methods are
+  Nystrom-aware. `glance()` reports `approx`, `nystrom_m`,
+  `inference`, and the effective degrees of freedom.
+
+## Limitations
+
+* Standard errors are *conditional* on the selected landmarks, fixed
+  $\lambda$, and the low-rank feature approximation. They are not
+  equivalent to exact KRLS standard errors and should not be used in
+  contexts that assume exact inference.
+* Only the Gaussian kernel is supported under `approx = "nystrom"`.
+* `kmeans` landmark selection is approximately reproducible under
+  `set.seed()` but not bit-stable across R versions; for strict
+  reproducibility use the default random sampling or supply landmarks
+  explicitly.
